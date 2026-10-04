@@ -191,7 +191,23 @@
 
         // Begehbare Gebäude: nur Wände blockieren den Spieler, die Türen bleiben offen.
         let weltKollisionsobjekte = [];
+        // Rechteckige Innenbereiche der begehbaren Gebäude. Diese Zonen werden
+        // für den Kugelschutz verwendet, weil die offenen Türen/Fenster bewusst
+        // keine Kollisionswände sind.
+        let weltGebaeudeZonen = [];
         const weltRaycaster = new THREE.Raycaster();
+
+        function spielerIstImGebaeudeGeschuetzt() {
+            for(const zone of weltGebaeudeZonen) {
+                if(camera.position.x > zone.x - zone.w/2 + 0.45 &&
+                   camera.position.x < zone.x + zone.w/2 - 0.45 &&
+                   camera.position.z > zone.z - zone.d/2 + 0.45 &&
+                   camera.position.z < zone.z + zone.d/2 - 0.45) {
+                    return true;
+                }
+            }
+            return false;
+        }
 
         function registriereWand(wand) {
             wand.userData.istGebaeudeWand = true;
@@ -494,6 +510,7 @@
 
         // Begehbare Versteck-Gebäude für alle Einsatzgebiete außer der bereits bebauten Ruinenstadt.
         function baueVersteckGebaeude(x, z, w, d, h, farbe, dachFarbe) {
+            weltGebaeudeZonen.push({x:x, z:z, w:w, d:d});
             const wandMat = new THREE.MeshLambertMaterial({color:farbe});
             const dachMat = new THREE.MeshLambertMaterial({color:dachFarbe});
             const bodenMat = new THREE.MeshLambertMaterial({color:0x343634});
@@ -543,6 +560,10 @@
 
         // Mehrstöckiges Hochhaus: begehbare Etagen, Treppen und offene Fenster zum Rausschießen.
         function baueHochhaus(x, z) {
+            // Das gesamte Hochhaus gilt als geschützter Innenbereich.
+            // Fenster/Türen sind offen sichtbar, aber der Spieler wird im
+            // Inneren nicht mehr von außen durch die offenen Flächen getroffen.
+            weltGebaeudeZonen.push({x:x, z:z, w:18, d:16});
             const etagen = 5;
             const etagenHoehe = 4.2;
             const w = 18, d = 16;
@@ -641,6 +662,7 @@
             // Beim Wechsel der Mission alte Etagen-Bodeninformationen entfernen.
             hochhausEtagenBoeden = [];
             weltKollisionsobjekte = [];
+            weltGebaeudeZonen = [];
             begehbareTreppen = [];
             gebaeudeTuerObjekte = [];
             hochhausEtagenMarker = [];
@@ -1544,7 +1566,7 @@
                 spielerZielFuerSchuss.y = 1.4;
                 const schussSicht = istSichtkontakt(soldatAugeFuerSchuss, spielerZielFuerSchuss);
 
-                if(g.entdeckt && dist < schussReichweite && schussSicht) {
+                if(g.entdeckt && dist < schussReichweite && schussSicht && !spielerIstImGebaeudeGeschuetzt()) {
                     if(parts.leftArm && parts.rightArm) {
                         parts.leftArm.rotation.z = -0.72;
                         parts.rightArm.rotation.z = 0.72;
