@@ -215,6 +215,8 @@
         let begehbareTreppen = [];
         let hochhausEtagenBoeden = [];
         let gebaeudeTuerObjekte = [];
+        let hochhausEtagenMarker = [];
+        let etagenMarkerBereit = true;
 
         function baueTuer(x,y,z,breite=2.6,hoehe=2.8,rotationY=0) {
             // Tür mit echter Scharnierbewegung. Solange sie geschlossen ist,
@@ -315,6 +317,115 @@
                 }
             }
             return false;
+        }
+
+        function baueEtagenMarker(x, z) {
+            hochhausEtagenMarker = [];
+            etagenMarkerBereit = true;
+
+            const markerFarben = [0x00e5ff,0x00ff88,0xffd000,0xff8c00,0xff3366];
+
+            for(let e=0;e<5;e++) {
+                const gruppe = new THREE.Group();
+
+                const marker = new THREE.Mesh(
+                    new THREE.CylinderGeometry(1.25,1.25,0.12,32),
+                    new THREE.MeshBasicMaterial({
+                        color: markerFarben[e],
+                        transparent:true,
+                        opacity:0.72
+                    })
+                );
+                marker.position.y = 0.08;
+                gruppe.add(marker);
+
+                const ring = new THREE.Mesh(
+                    new THREE.TorusGeometry(1.05,0.08,8,32),
+                    new THREE.MeshBasicMaterial({color:markerFarben[e]})
+                );
+                ring.rotation.x = Math.PI/2;
+                ring.position.y = 0.16;
+                gruppe.add(ring);
+
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 96;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = 'rgba(0,0,0,0.82)';
+                ctx.fillRect(0,0,256,96);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 34px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(e === 0 ? 'ERDGESCHOSS' : 'STOCKWERK '+(e+1),128,42);
+                ctx.font = 'bold 21px sans-serif';
+                ctx.fillText('HINEINLAUFEN',128,72);
+
+                const tex = new THREE.CanvasTexture(canvas);
+                const label = new THREE.Sprite(new THREE.SpriteMaterial({
+                    map:tex,
+                    transparent:true,
+                    depthTest:false
+                }));
+                label.scale.set(3.2,1.2,1);
+                label.position.y = 2.8;
+                gruppe.add(label);
+
+                gruppe.position.set(x-5.0, e*4.2, z-2.0);
+                szenerieGruppe.add(gruppe);
+
+                hochhausEtagenMarker.push({
+                    mesh:gruppe,
+                    floor:e,
+                    x:x-5.0,
+                    z:z-2.0
+                });
+            }
+        }
+
+        function aktualisiereEtagenMarker() {
+            if(hochhausEtagenMarker.length === 0) return;
+
+            // Nach einem Teleport muss der Spieler die Markierung erst
+            // verlassen, bevor sie erneut ausgelöst werden kann.
+            if(!etagenMarkerBereit) {
+                const m = hochhausEtagenMarker[0];
+                const dx = camera.position.x - m.x;
+                const dz = camera.position.z - m.z;
+                if(Math.sqrt(dx*dx + dz*dz) > 2.7) {
+                    etagenMarkerBereit = true;
+                }
+                return;
+            }
+
+            for(const m of hochhausEtagenMarker) {
+                const dx = camera.position.x - m.x;
+                const dz = camera.position.z - m.z;
+                const dist = Math.sqrt(dx*dx + dz*dz);
+
+                if(dist < 1.55) {
+                    const naechsteEtage = m.floor < 4 ? m.floor + 1 : 0;
+
+                    camera.position.x = m.x;
+                    camera.position.z = m.z;
+                    camera.position.y = naechsteEtage * 4.2 + sprungHoehe;
+
+                    istInDerLuft = false;
+                    sprungGeschwindigkeit = 0;
+                    etagenMarkerBereit = false;
+
+                    const status = document.getElementById('cover-status');
+                    status.innerText = naechsteEtage === 0
+                        ? '↩️ ZURÜCK INS ERDGESCHOSS'
+                        : '⬆️ STOCKWERK ' + (naechsteEtage + 1);
+                    status.style.color = '#00e5ff';
+                    clearTimeout(window.etagenMarkerTimer);
+                    window.etagenMarkerTimer = setTimeout(() => {
+                        ausgebenUI();
+                    }, 900);
+
+                    break;
+                }
+            }
         }
 
         function findeEtagenBoden() {
@@ -532,6 +643,8 @@
             weltKollisionsobjekte = [];
             begehbareTreppen = [];
             gebaeudeTuerObjekte = [];
+            hochhausEtagenMarker = [];
+            etagenMarkerBereit = true;
             while(szenerieGruppe.children.length) {
                 const kind = szenerieGruppe.children.pop();
                 kind.traverse(o => {
@@ -562,6 +675,7 @@
             // Ein Hochhaus als zentraler taktischer Punkt in der Ruinenstadt.
             if(daten.objekt === "stadt") {
                 baueHochhaus(28, -28);
+                baueEtagenMarker(28, -28);
             }
 
             // Jedes Level bekommt eigene begehbare Gebäude zum Verstecken.
@@ -1231,7 +1345,10 @@
             const weltGrenze = 126;
             camera.position.x = Math.max(-weltGrenze, Math.min(weltGrenze, camera.position.x));
             camera.position.z = Math.max(-weltGrenze, Math.min(weltGrenze, camera.position.z));
-            const aufTreppe = aktualisiereTreppen();
+            aktualisiereEtagenMarker();
+            // Die sichtbaren Treppen bleiben im Hochhaus, aber die Etagen werden
+            // jetzt sicher über die markierten Teleportflächen gewechselt.
+            const aufTreppe = false;
             if(!aufTreppe) {
                 // Böden der Hochhaus-Etagen tragen den Spieler, damit er auf
                 // jedem Stockwerk stehen und springen kann, ohne durchzufallen.
