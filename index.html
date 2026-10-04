@@ -161,14 +161,58 @@
         const normaleFov = 75;
         const zielFov = 42;
 
+        function visiereNaechstenSoldaten() {
+            if(typeof gegnerArray === 'undefined' || gegnerArray.length === 0) return false;
+
+            let naechster = null;
+            let kleinsteDistanz = Infinity;
+
+            for(const g of gegnerArray) {
+                if(!g || !g.mesh || g.dying) continue;
+                const dx = g.mesh.position.x - camera.position.x;
+                const dy = (g.mesh.position.y + 1.2) - camera.position.y;
+                const dz = g.mesh.position.z - camera.position.z;
+                const distanz = Math.sqrt(dx*dx + dy*dy + dz*dz);
+
+                if(distanz < kleinsteDistanz) {
+                    kleinsteDistanz = distanz;
+                    naechster = g;
+                }
+            }
+
+            if(!naechster) return false;
+
+            const ziel = naechster.mesh.position.clone();
+            ziel.y += 1.2;
+
+            const dx = ziel.x - camera.position.x;
+            const dy = ziel.y - camera.position.y;
+            const dz = ziel.z - camera.position.z;
+
+            // Kamera exakt auf den nächstgelegenen Soldaten ausrichten.
+            rotationY = Math.atan2(-dx, -dz);
+            const horizontaleDistanz = Math.sqrt(dx*dx + dz*dz);
+            rotationX = Math.atan2(dy, horizontaleDistanz);
+            rotationX = Math.max(-Math.PI/3, Math.min(Math.PI/3, rotationX));
+
+            return true;
+        }
+
         function setzeZielen(aktiv) {
             zielenAktiv = aktiv;
+
+            if(aktiv) {
+                // Beim Einschalten einmalig den nächstgelegenen Soldaten anvisieren.
+                visiereNaechstenSoldaten();
+            }
+
             camera.fov = aktiv ? zielFov : normaleFov;
             camera.updateProjectionMatrix();
+
             const btn = document.getElementById('aim-btn');
             if(btn) {
                 btn.classList.toggle('aktiv', aktiv);
-                btn.textContent = aktiv ? 'ZIELEN' : 'ZIELEN';
+                btn.textContent = aktiv ? '🎯 ZIEL' : 'ZIELEN';
             }
         }
         let spieler = { hp: 100, credits: 0, mission: 1, lastDamageTime: 0 };
@@ -190,17 +234,10 @@
         aimBtn.addEventListener("pointerdown", (e) => {
             e.preventDefault();
             e.stopPropagation();
-            setzeZielen(true);
-            aimBtn.setPointerCapture?.(e.pointerId);
-        });
-        aimBtn.addEventListener("pointerup", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setzeZielen(false);
-        });
-        aimBtn.addEventListener("pointercancel", () => setzeZielen(false));
-        aimBtn.addEventListener("pointerleave", (e) => {
-            if(e.buttons === 0) setzeZielen(false);
+
+            // Ein Klick schaltet den Zielmodus an/aus.
+            // Beim Loslassen bleibt die Sicht unverändert.
+            setzeZielen(!zielenAktiv);
         });
         
         // --- THREE.JS SETUP ---
