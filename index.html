@@ -1193,8 +1193,8 @@
 
         function feuerWaffe() {
             playShootSound();
-            // Kleine Rückstoßanimation der Kamera
-            rotationX = Math.min(Math.PI/3, rotationX + 0.025);
+            // Kein Kamera-Hochziehen beim Schießen.
+            // Der Rückstoß bleibt nur in der Schussanimation/Optik sichtbar.
             const raycaster = new THREE.Raycaster();
             raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
             
