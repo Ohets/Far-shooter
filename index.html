@@ -387,10 +387,12 @@
             const segmentBreite=(w-tuerBreite)/2;
             const frontLinks=new THREE.Mesh(new THREE.BoxGeometry(segmentBreite,h,dicke),wandMat);
             frontLinks.position.set(x-(tuerBreite/2+segmentBreite/2),h/2,z+d/2);
-            registriereWand(frontLinks);
+            // Die komplette Frontwand mit der Tür bleibt kollisionsfrei.
+            // Die Seiten- und Rückwand schützen weiterhin vor dem Durchlaufen.
+            szenerieGruppe.add(frontLinks);
             const frontRechts=frontLinks.clone();
             frontRechts.position.x=x+(tuerBreite/2+segmentBreite/2);
-            registriereWand(frontRechts);
+            szenerieGruppe.add(frontRechts);
             const rahmen=new THREE.Mesh(new THREE.BoxGeometry(tuerBreite,0.5,dicke),wandMat);
             rahmen.position.set(x,h-0.25,z+d/2);
             // Der Bereich direkt über der Tür darf keine Kollisionsmaske haben.
