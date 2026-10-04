@@ -15,7 +15,7 @@
         #crosshair { position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; background: red; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
         
         /* Mobile Touch Controls */
-        .joystick { position: absolute; bottom: 40px; border-radius: 50%; background: rgba(255,255,255,0.2); pointer-events: auto; }
+        .joystick { position: absolute; bottom: 40px; border-radius: 50%; background: rgba(255,255,255,0.2); pointer-events: auto; touch-action: none; }
         #move-stick { left: 40px; width: 100px; height: 100px; }
         #look-stick { right: 40px; width: 100px; height: 100px; }
         #jump-btn { position: absolute; bottom: 245px; right: 55px; width: 64px; height: 64px; background: rgba(40,150,255,0.65); border-radius: 50%; display:flex; align-items:center; justify-content:center; font-size:14px; pointer-events:auto; z-index:4; }
@@ -1113,27 +1113,83 @@
         // --- STEUERUNG ---
         let moveInput = { x: 0, y: 0 };
         let lookInput = { x: 0, y: 0 };
+        let moveTouchId = null;
+        let lookTouchId = null;
 
-        document.getElementById('move-stick').addEventListener('touchmove', (e) => {
-            let touch = e.touches[0];
-            let rect = e.target.getBoundingClientRect();
+        const moveStick = document.getElementById('move-stick');
+        const lookStick = document.getElementById('look-stick');
+        const fireBtn = document.getElementById('fire-btn');
+
+        // Jede Joystick-Seite merkt sich ihren eigenen Finger.
+        // Dadurch kann der Feuer-Finger niemals versehentlich den Blick nach oben/unten steuern.
+        moveStick.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if(moveTouchId === null && e.changedTouches.length) {
+                moveTouchId = e.changedTouches[0].identifier;
+            }
+        }, {passive:false});
+
+        moveStick.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if(moveTouchId === null) return;
+            const touch = Array.from(e.touches).find(t => t.identifier === moveTouchId);
+            if(!touch) return;
+            const rect = moveStick.getBoundingClientRect();
             moveInput.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
             moveInput.y = -(((touch.clientY - rect.top) / rect.height) * 2 - 1);
-        });
-        document.getElementById('move-stick').addEventListener('touchend', () => moveInput = { x: 0, y: 0 });
+        }, {passive:false});
 
-        document.getElementById('look-stick').addEventListener('touchmove', (e) => {
-            let touch = e.touches[0];
-            let rect = e.target.getBoundingClientRect();
+        function stopMoveTouch(e) {
+            if(moveTouchId === null) return;
+            const ended = Array.from(e.changedTouches).some(t => t.identifier === moveTouchId);
+            if(ended) {
+                moveTouchId = null;
+                moveInput = { x: 0, y: 0 };
+            }
+        }
+        moveStick.addEventListener('touchend', stopMoveTouch);
+        moveStick.addEventListener('touchcancel', stopMoveTouch);
+
+        lookStick.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if(lookTouchId === null && e.changedTouches.length) {
+                lookTouchId = e.changedTouches[0].identifier;
+            }
+        }, {passive:false});
+
+        lookStick.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if(lookTouchId === null) return;
+            const touch = Array.from(e.touches).find(t => t.identifier === lookTouchId);
+            if(!touch) return;
+            const rect = lookStick.getBoundingClientRect();
             lookInput.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
             lookInput.y = -(((touch.clientY - rect.top) / rect.height) * 2 - 1);
-        });
-        document.getElementById('look-stick').addEventListener('touchend', () => lookInput = { x: 0, y: 0 });
+        }, {passive:false});
 
-        document.getElementById('fire-btn').addEventListener('touchstart', (e) => {
+        function stopLookTouch(e) {
+            if(lookTouchId === null) return;
+            const ended = Array.from(e.changedTouches).some(t => t.identifier === lookTouchId);
+            if(ended) {
+                lookTouchId = null;
+                lookInput = { x: 0, y: 0 };
+            }
+        }
+        lookStick.addEventListener('touchend', stopLookTouch);
+        lookStick.addEventListener('touchcancel', stopLookTouch);
+
+        // Der Feuerknopf reagiert ausschließlich auf seinen eigenen Touch.
+        // Er darf weder Joystick-Eingaben noch Browser-Scroll-/Gesten auslösen.
+        fireBtn.style.touchAction = 'none';
+        fireBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
+            e.stopPropagation();
             feuerWaffe();
-        });
+        }, {passive:false});
+        fireBtn.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        }, {passive:false});
 
         function feuerWaffe() {
             playShootSound();
