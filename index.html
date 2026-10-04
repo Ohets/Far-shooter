@@ -328,16 +328,37 @@
         }
 
         function korrigiereGebaeudeKollision(vorherX, vorherZ) {
-            const spielerRadius = 0.55;
-            for(const objekt of weltKollisionsobjekte) {
-                const box = new THREE.Box3().setFromObject(objekt);
-                if(camera.position.x > box.min.x - spielerRadius &&
-                   camera.position.x < box.max.x + spielerRadius &&
-                   camera.position.z > box.min.z - spielerRadius &&
-                   camera.position.z < box.max.z + spielerRadius) {
+            // Der Spieler hat nur eine kleine Kollisionsmaske. Dadurch bleibt
+            // die Türöffnung tatsächlich so breit wie das sichtbare Loch.
+            const spielerRadius = 0.22;
+
+            // X und Z getrennt prüfen: So kann der Spieler an einer Wand
+            // entlanglaufen, statt bei einer Ecke komplett zurückgesetzt zu werden.
+            const pruefePosition = (x, z) => {
+                for(const objekt of weltKollisionsobjekte) {
+                    const box = new THREE.Box3().setFromObject(objekt);
+                    if(x > box.min.x - spielerRadius &&
+                       x < box.max.x + spielerRadius &&
+                       z > box.min.z - spielerRadius &&
+                       z < box.max.z + spielerRadius) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+
+            const aktuelleX = camera.position.x;
+            const aktuelleZ = camera.position.z;
+
+            if(!pruefePosition(aktuelleX, aktuelleZ)) {
+                // Zuerst nur X zurücksetzen. Wenn das nicht reicht, nur Z.
+                if(pruefePosition(aktuelleX, vorherZ)) {
+                    camera.position.z = vorherZ;
+                } else if(pruefePosition(vorherX, aktuelleZ)) {
+                    camera.position.x = vorherX;
+                } else {
                     camera.position.x = vorherX;
                     camera.position.z = vorherZ;
-                    return;
                 }
             }
         }
