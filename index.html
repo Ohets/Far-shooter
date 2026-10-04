@@ -412,6 +412,85 @@
             baueTuer(x,0,z+d/2+0.08,tuerBreite,h,0);
         }
 
+        // Mehrstöckiges Hochhaus: begehbare Etagen, Treppen und offene Fenster zum Rausschießen.
+        function baueHochhaus(x, z) {
+            const etagen = 5;
+            const etagenHoehe = 4.2;
+            const w = 18, d = 16;
+            const wandDicke = 0.45;
+            const wandMat = new THREE.MeshLambertMaterial({color:0x5b6268});
+            const innenMat = new THREE.MeshLambertMaterial({color:0x3b3f42});
+            const fensterMat = new THREE.MeshLambertMaterial({color:0x6ea8c7, transparent:true, opacity:0.48});
+            const bodenMat = new THREE.MeshLambertMaterial({color:0x292c2f});
+            const dachMat = new THREE.MeshLambertMaterial({color:0x202326});
+
+            for(let e=0;e<etagen;e++) {
+                const y=e*etagenHoehe;
+                const boden=new THREE.Mesh(new THREE.BoxGeometry(w,0.25,d),bodenMat);
+                boden.position.set(x,y+0.12,z);
+                szenerieGruppe.add(boden);
+
+                const links=new THREE.Mesh(new THREE.BoxGeometry(wandDicke,etagenHoehe,d),wandMat);
+                links.position.set(x-w/2,y+etagenHoehe/2,z);
+                registriereWand(links);
+                const rechts=links.clone();
+                rechts.position.x=x+w/2;
+                registriereWand(rechts);
+                const rueck=new THREE.Mesh(new THREE.BoxGeometry(w,etagenHoehe,wandDicke),wandMat);
+                rueck.position.set(x,y+etagenHoehe/2,z-d/2);
+                registriereWand(rueck);
+
+                // Vorderseite mit großen offenen Schießfenstern.
+                const frontSeg=(w-5.2)/2;
+                const frontL=new THREE.Mesh(new THREE.BoxGeometry(frontSeg,etagenHoehe,wandDicke),wandMat);
+                frontL.position.set(x-(2.6+frontSeg/2),y+etagenHoehe/2,z+d/2);
+                szenerieGruppe.add(frontL);
+                const frontR=frontL.clone();
+                frontR.position.x=x+(2.6+frontSeg/2);
+                szenerieGruppe.add(frontR);
+                const fensterRahmen=new THREE.Mesh(new THREE.BoxGeometry(5.2,0.35,wandDicke),wandMat);
+                fensterRahmen.position.set(x,y+etagenHoehe-0.18,z+d/2);
+                szenerieGruppe.add(fensterRahmen);
+
+                // Fensterflächen sind nur sichtbar, nicht kollidierend.
+                for(let f=0;f<3;f++) {
+                    const fenster=new THREE.Mesh(new THREE.BoxGeometry(3.8,2.5,0.08),fensterMat);
+                    fenster.position.set(x-5.2+f*5.2,y+2.0,z+d/2+0.04);
+                    szenerieGruppe.add(fenster);
+                }
+
+                // Seitliche Schießfenster.
+                for(const sx of [-w/2-0.04,w/2+0.04]) {
+                    const fenster=new THREE.Mesh(new THREE.BoxGeometry(0.08,2.5,3.8),fensterMat);
+                    fenster.position.set(x+sx,y+2.0,z);
+                    szenerieGruppe.add(fenster);
+                }
+            }
+
+            const dach=new THREE.Mesh(new THREE.BoxGeometry(w+0.8,0.4,d+0.8),dachMat);
+            dach.position.set(x,etagen*etagenHoehe+0.2,z);
+            szenerieGruppe.add(dach);
+
+            // Innentreppe verbindet alle Stockwerke.
+            for(let e=0;e<etagen-1;e++) {
+                baueTreppe(x-5.0,z-2.0+e*0.0,etagenHoehe,1);
+                // Die Treppen werden pro Etage optisch nach oben versetzt.
+                const treppe=begehbareTreppen[begehbareTreppen.length-1];
+                treppe.yBasis=e*etagenHoehe;
+            }
+
+            // Eingang vorne: breite Öffnung, damit der Spieler sicher hineinkommt.
+            const tuerBreite=4.5;
+            const tuerH=3.2;
+            const eingangLinks=new THREE.Mesh(new THREE.BoxGeometry((w-tuerBreite)/2,tuerH,wandDicke),wandMat);
+            eingangLinks.position.set(x-(tuerBreite/2+(w-tuerBreite)/4),tuerH/2,z+d/2+0.01);
+            szenerieGruppe.add(eingangLinks);
+            const eingangRechts=eingangLinks.clone();
+            eingangRechts.position.x=x+(tuerBreite/2+(w-tuerBreite)/4);
+            szenerieGruppe.add(eingangRechts);
+            baueTuer(x,0,z+d/2+0.08,tuerBreite,tuerH,0);
+        }
+
         const missionsSzenerien = [
             {name:"Militärwald", boden:0x315f28, himmel:0x55738a, nebel:0.008, objekt:"wald"},
             {name:"Urwald", boden:0x164d20, himmel:0x3f6870, nebel:0.012, objekt:"urwald"},
@@ -455,6 +534,11 @@
             );
             floor.rotation.x = -Math.PI / 2;
             szenerieGruppe.add(floor);
+
+            // Ein Hochhaus als zentraler taktischer Punkt in der Ruinenstadt.
+            if(daten.objekt === "stadt") {
+                baueHochhaus(28, -28);
+            }
 
             // Jedes Level bekommt eigene begehbare Gebäude zum Verstecken.
             if(daten.objekt !== "stadt") {
