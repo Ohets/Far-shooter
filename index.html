@@ -20,6 +20,8 @@
         #look-stick { right: 40px; width: 100px; height: 100px; }
         #jump-btn { position: absolute; bottom: 245px; right: 55px; width: 64px; height: 64px; background: rgba(40,150,255,0.65); border-radius: 50%; display:flex; align-items:center; justify-content:center; font-size:14px; pointer-events:auto; z-index:4; }
         #fire-btn { position: absolute; bottom: 160px; right: 50px; width: 70px; height: 70px; background: rgba(255, 0, 0, 0.6); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; pointer-events: auto; }
+        #aim-btn { position: absolute; bottom: 160px; right: 135px; width: 64px; height: 64px; background: rgba(60,60,60,0.78); border: 2px solid rgba(255,255,255,0.65); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; pointer-events: auto; touch-action: none; z-index: 4; }
+        #aim-btn.aktiv { background: rgba(40,140,255,0.9); border-color: #8fd3ff; }
         #shop-btn { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); padding: 12px 24px; background: #FFD700; color: black; border-radius: 5px; pointer-events: auto; font-size: 16px; }
         #level-btn { position: absolute; top: 70px; left: 10px; padding: 10px 16px; background: rgba(30,120,210,0.9); color: white; border-radius: 6px; pointer-events: auto; font-weight: bold; z-index: 5; }
         #level-menu { display:none; position:absolute; top:5%; left:5%; width:90%; height:90%; background:rgba(8,12,14,0.96); border:2px solid #4aa3df; color:white; pointer-events:auto; padding:16px; box-sizing:border-box; overflow-y:auto; z-index:20; }
@@ -56,6 +58,7 @@
     <div id="move-stick" class="joystick"></div>
     <div id="look-stick" class="joystick"></div>
     <div id="jump-btn" class="ui-element">SPRUNG</div>
+    <div id="aim-btn">ZIELEN</div>
     <div id="fire-btn" class="ui-element">FEUER</div>
     <div id="level-btn">LEVEL</div>
     <div id="shop-btn">WAFFEN-SHOP</div>
@@ -154,6 +157,20 @@
         ];
         
         let aktuelleWaffe = waffenListe[0];
+        let zielenAktiv = false;
+        const normaleFov = 75;
+        const zielFov = 42;
+
+        function setzeZielen(aktiv) {
+            zielenAktiv = aktiv;
+            camera.fov = aktiv ? zielFov : normaleFov;
+            camera.updateProjectionMatrix();
+            const btn = document.getElementById('aim-btn');
+            if(btn) {
+                btn.classList.toggle('aktiv', aktiv);
+                btn.textContent = aktiv ? 'ZIELEN' : 'ZIELEN';
+            }
+        }
         let spieler = { hp: 100, credits: 0, mission: 1, lastDamageTime: 0 };
         let sprungHoehe = 2;
         let sprungGeschwindigkeit = 0;
@@ -168,13 +185,30 @@
         }
 
         document.getElementById("jump-btn").addEventListener("pointerdown", springen);
+
+        const aimBtn = document.getElementById("aim-btn");
+        aimBtn.addEventListener("pointerdown", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setzeZielen(true);
+            aimBtn.setPointerCapture?.(e.pointerId);
+        });
+        aimBtn.addEventListener("pointerup", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setzeZielen(false);
+        });
+        aimBtn.addEventListener("pointercancel", () => setzeZielen(false));
+        aimBtn.addEventListener("pointerleave", (e) => {
+            if(e.buttons === 0) setzeZielen(false);
+        });
         
         // --- THREE.JS SETUP ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x223344);
         scene.fog = new THREE.FogExp2(0x223344, 0.015);
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(normaleFov, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.getElementById('canvas-container').appendChild(renderer.domElement);
