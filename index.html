@@ -324,7 +324,7 @@
             const raycaster = new THREE.Raycaster();
             raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
             
-            const intersects = raycaster.intersectObjects(gegnerArray.map(g => g.mesh));
+            const intersects = raycaster.intersectObjects(gegnerArray.map(g => g.mesh), true);
             
             if(intersects.length > 0) {
                 let getroffenMesh = intersects[0].object;
