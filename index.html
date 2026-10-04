@@ -94,6 +94,21 @@
             osc.stop(audioCtx.currentTime + 0.1);
         }
 
+        function playPlayerHitSound() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(70, audioCtx.currentTime + 0.12);
+            gain.gain.setValueAtTime(0.22, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.12);
+        }
+
         function playWinSound() {
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
@@ -121,7 +136,7 @@
         ];
         
         let aktuelleWaffe = waffenListe[0];
-        let spieler = { hp: 100, credits: 0, mission: 1 };
+        let spieler = { hp: 100, credits: 0, mission: 1, lastDamageTime: 0 };
         
         // --- THREE.JS SETUP ---
         const scene = new THREE.Scene();
@@ -275,18 +290,25 @@
                 const distance = mesh.position.distanceTo(camera.position);
                 if(distance < 15) mesh.position.z -= 25;
                 scene.add(mesh);
+                const verhalten = ["angreifer", "scharfschuetze", "flanker", "verteidiger"][Math.floor(Math.random()*4)];
                 gegnerArray.push({
                     mesh,
                     material: mesh.userData.parts.uniformMat,
                     hp: 100 + (spieler.mission * 20),
+                    maxHp: 100 + (spieler.mission * 20),
                     flashTimer: 0,
-                    attackCooldown: Math.random()*2,
+                    attackCooldown: Math.random()*1.5,
                     animTime: Math.random()*10,
                     walkPhase: Math.random()*Math.PI*2,
                     dying: false,
                     deathTime: 0,
                     muzzleTime: 0,
-                    shotCooldown: 1.5 + Math.random()*2
+                    shotCooldown: 1.0 + Math.random()*2.5,
+                    verhalten,
+                    spawnPosition: mesh.position.clone(),
+                    strafeDir: Math.random() < 0.5 ? -1 : 1,
+                    strafeTimer: 1 + Math.random()*2,
+                    lastPlayerShot: 0
                 });
             }
             ausgebenUI();
@@ -421,6 +443,13 @@
             requestAnimationFrame(animate);
             const delta = clock.getDelta();
 
+            if(spieler.lastDamageTime > 0) {
+                spieler.lastDamageTime -= delta;
+                document.getElementById('hud').style.transform = Math.sin(spieler.lastDamageTime * 55) * 3 + 'px';
+            } else {
+                document.getElementById('hud').style.transform = 'translateX(0)';
+            }
+
             rotationY -= lookInput.x * 0.03;
             rotationX += lookInput.y * 0.03;
             rotationX = Math.max(-Math.PI/3, Math.min(Math.PI/3, rotationX));
@@ -438,13 +467,19 @@
                     if(g.flashTimer <= 0) g.material.color.setHex(0x3d5137);
                 }
 
-                // Soldaten-Animationen: Gehen, Zielen, Schießen und Sterben
+                // Unterschiedliche KI-Verhalten
                 g.animTime += delta;
 
                 const parts = g.mesh.userData.parts;
-                const walk = Math.sin(g.animTime * 7 + g.walkPhase) * 0.55;
+                const walk = Math.sin(g.animTime * (5.5 + spieler.mission * 0.1) + g.walkPhase) * 0.55;
 
-                // Todesanimation: Soldat fällt nach hinten und sinkt leicht ab
+                // Treffer-Blinken zurücksetzen
+                if(g.flashTimer > 0) {
+                    g.flashTimer -= delta;
+                    if(g.flashTimer <= 0) g.material.color.setHex(0x3d5137);
+                }
+
+                // Todesanimation
                 if(g.dying) {
                     g.deathTime += delta;
                     const t = Math.min(g.deathTime / 0.65, 1);
@@ -461,7 +496,7 @@
                     return;
                 }
 
-                // Laufanimation mit klaren Arm-/Beinbewegungen
+                // Laufanimation
                 if(parts.leftArm && parts.rightArm) {
                     parts.leftArm.rotation.z = -0.22 + walk * 0.45;
                     parts.rightArm.rotation.z = 0.22 - walk * 0.45;
@@ -474,14 +509,74 @@
                 let richtung = new THREE.Vector3().subVectors(camera.position, g.mesh.position);
                 richtung.y = 0;
                 const dist = richtung.length();
-                if(dist > 8) {
-                    richtung.normalize();
-                    g.mesh.position.addScaledVector(richtung, delta * (1.2 + spieler.mission * 0.15));
-                    g.mesh.rotation.y = Math.atan2(richtung.x, richtung.z);
-                } else {
-                    g.mesh.rotation.y = Math.atan2(richtung.x, richtung.z);
 
-                    // Soldat nimmt das Gewehr in Anschlag
+                // Verhalten 1: Angreifer - rennt direkt auf den Spieler zu
+                // Verhalten 2: Scharfschütze - hält Abstand und schießt aus der Distanz
+                // Verhalten 3: Flanker - versucht seitlich um den Spieler herumzukommen
+                // Verhalten 4: Verteidiger - bleibt eher bei seinem Startgebiet und greift dort an
+                let ziel = new THREE.Vector3();
+
+                if(g.verhalten === "angreifer") {
+                    ziel.copy(camera.position);
+                    if(dist > 6) {
+                        richtung.normalize();
+                        g.mesh.position.addScaledVector(richtung, delta * (2.0 + spieler.mission * 0.12));
+                    }
+                } else if(g.verhalten === "scharfschuetze") {
+                    if(dist < 16) {
+                        richtung.normalize();
+                        g.mesh.position.addScaledVector(richtung, -delta * 1.0);
+                    } else if(dist > 28) {
+                        richtung.normalize();
+                        g.mesh.position.addScaledVector(richtung, delta * 0.8);
+                    } else {
+                        // Kleine seitliche Positionsänderungen, damit der Scharfschütze nicht stillsteht
+                        const side = new THREE.Vector3(-richtung.z, 0, richtung.x).multiplyScalar(g.strafeDir);
+                        g.strafeTimer -= delta;
+                        if(g.strafeTimer <= 0) {
+                            g.strafeDir *= -1;
+                            g.strafeTimer = 1.5 + Math.random()*2;
+                        }
+                        g.mesh.position.addScaledVector(side, delta * 0.35);
+                    }
+                } else if(g.verhalten === "flanker") {
+                    const side = new THREE.Vector3(-richtung.z, 0, richtung.x).multiplyScalar(g.strafeDir);
+                    if(dist > 10) {
+                        richtung.normalize();
+                        ziel.copy(richtung).multiplyScalar(0.55).add(side.normalize().multiplyScalar(0.8)).normalize();
+                        g.mesh.position.addScaledVector(ziel, delta * 1.55);
+                    } else {
+                        g.strafeTimer -= delta;
+                        if(g.strafeTimer <= 0) {
+                            g.strafeDir *= -1;
+                            g.strafeTimer = 1 + Math.random()*1.5;
+                        }
+                        g.mesh.position.addScaledVector(side.normalize(), delta * 1.0 * g.strafeDir);
+                    }
+                } else {
+                    // Verteidiger: bewegt sich nur begrenzt vom Spawnpunkt weg
+                    const homeDir = new THREE.Vector3().subVectors(g.spawnPosition, g.mesh.position);
+                    if(homeDir.length() > 9) {
+                        homeDir.normalize();
+                        g.mesh.position.addScaledVector(homeDir, delta * 1.2);
+                    } else if(dist < 13) {
+                        richtung.normalize();
+                        g.mesh.position.addScaledVector(richtung, -delta * 0.8);
+                    }
+                }
+
+                // Immer zum Spieler drehen, wenn er in Reichweite ist.
+                const lookDir = new THREE.Vector3().subVectors(camera.position, g.mesh.position);
+                lookDir.y = 0;
+                if(lookDir.lengthSq() > 0.01) {
+                    g.mesh.rotation.y = Math.atan2(lookDir.x, lookDir.z);
+                }
+
+                // Waffenhaltung: nah = Anschlag, sonst normale Laufhaltung
+                const schussReichweite = g.verhalten === "scharfschuetze" ? 42 :
+                                         g.verhalten === "verteidiger" ? 30 : 24;
+
+                if(dist < schussReichweite) {
                     if(parts.leftArm && parts.rightArm) {
                         parts.leftArm.rotation.z = -0.72;
                         parts.rightArm.rotation.z = 0.72;
@@ -491,11 +586,13 @@
                         parts.rightLeg.rotation.x = 0;
                     }
 
-                    // Schussanimation mit Mündungsfeuer
+                    // Soldaten schießen jetzt wirklich auf den Spieler.
                     g.shotCooldown -= delta;
-                    if(g.shotCooldown <= 0) {
-                        g.shotCooldown = 1.5 + Math.random()*1.5;
-                        g.muzzleTime = 0.09;
+                    if(g.shotCooldown <= 0 && dist > 5) {
+                        const cooldownBase = g.verhalten === "scharfschuetze" ? 2.2 :
+                                             g.verhalten === "angreifer" ? 1.0 : 1.5;
+                        g.shotCooldown = cooldownBase + Math.random()*1.2;
+                        g.muzzleTime = 0.10;
                         playShootSound();
 
                         const flash = new THREE.Mesh(
@@ -506,8 +603,35 @@
                         g.mesh.add(flash);
                         g.muzzleFlash = flash;
 
-                        // kurzer Waffen-Rückstoß
                         if(parts.rifle) parts.rifle.position.z = -0.9;
+
+                        // Trefferchance abhängig vom Soldatentyp und der Entfernung.
+                        const accuracyBase = g.verhalten === "scharfschuetze" ? 0.88 :
+                                             g.verhalten === "angreifer" ? 0.48 : 0.65;
+                        const distancePenalty = Math.min(dist / 70, 0.30);
+                        const hitChance = Math.max(0.25, accuracyBase - distancePenalty);
+
+                        if(Math.random() < hitChance) {
+                            const damage = g.verhalten === "scharfschuetze" ? 12 :
+                                           g.verhalten === "angreifer" ? 7 : 9;
+                            spieler.hp = Math.max(0, spieler.hp - damage);
+                            spieler.lastDamageTime = 0.18;
+                            playPlayerHitSound();
+                            ausgebenUI();
+
+                            if(spieler.hp <= 0) {
+                                spieler.hp = 0;
+                                ausgebenUI();
+                                setTimeout(() => {
+                                    if(spieler.hp <= 0) {
+                                        alert("Du wurdest von den Soldaten eliminiert! Die Mission startet neu.");
+                                        spieler.hp = 100;
+                                        starteMission();
+                                        ausgebenUI();
+                                    }
+                                }, 250);
+                            }
+                        }
                     }
 
                     if(g.muzzleTime > 0) {
@@ -524,17 +648,22 @@
                             if(parts.rifle) parts.rifle.position.z = -0.75;
                         }
                     }
+                }
 
-                    // Nahkampfangriff bleibt erhalten
+                // Nahkampfschaden nur bei sehr kurzer Distanz
+                if(dist < 2.2) {
                     g.attackCooldown -= delta;
                     if(g.attackCooldown <= 0) {
-                        spieler.hp -= 4;
+                        spieler.hp = Math.max(0, spieler.hp - 4);
                         g.attackCooldown = 1.0;
+                        playPlayerHitSound();
                         ausgebenUI();
+
                         if(spieler.hp <= 0) {
-                            alert("Du wurdest eliminiert! Die Mission startet neu.");
+                            alert("Du wurdest im Nahkampf eliminiert! Die Mission startet neu.");
                             spieler.hp = 100;
                             starteMission();
+                            ausgebenUI();
                         }
                     }
                 }
