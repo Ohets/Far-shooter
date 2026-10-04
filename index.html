@@ -201,17 +201,81 @@
         let gebaeudeTuerObjekte = [];
 
         function baueTuer(x,y,z,breite=2.6,hoehe=2.8,rotationY=0) {
+            // Tür mit echter Scharnierbewegung. Solange sie geschlossen ist,
+            // blockiert sie den Eingang; beim Näherkommen öffnet sie automatisch.
+            const pivot = new THREE.Group();
+            pivot.position.set(x-breite/2, y, z);
+            pivot.rotation.y = rotationY;
+            
             const tuer = new THREE.Mesh(
                 new THREE.BoxGeometry(breite, hoehe, 0.18),
                 new THREE.MeshLambertMaterial({color:0x30251d})
             );
-            tuer.position.set(x,y+hoehe/2,z);
-            tuer.rotation.y=rotationY;
-            tuer.userData.offen=true;
-            // Tür bleibt optisch vorhanden, ist aber nicht kollidierend, damit der Spieler hinein kann.
-            szenerieGruppe.add(tuer);
-            gebaeudeTuerObjekte.push(tuer);
+            tuer.position.set(breite/2, hoehe/2, 0);
+            tuer.castShadow = true;
+            pivot.add(tuer);
+            szenerieGruppe.add(pivot);
+            
+            gebaeudeTuerObjekte.push({
+                pivot:pivot,
+                mesh:tuer,
+                hinge:new THREE.Vector3(x-breite/2, y, z),
+                breite:breite,
+                zielOffen:false,
+                offen:false,
+                collisionAdded:true
+            });
+            weltKollisionsobjekte.push(tuer);
             return tuer;
+        }
+
+        function aktualisiereTueren() {
+            let meldung = '';
+            for(const t of gebaeudeTuerObjekte) {
+                const dx = camera.position.x - t.hinge.x;
+                const dz = camera.position.z - t.hinge.z;
+                const dist = Math.sqrt(dx*dx + dz*dz);
+                
+                // Ab 5 Metern öffnet die Tür, ab 7 Metern schließt sie wieder.
+                if(dist < 5.2) {
+                    t.zielOffen = true;
+                } else if(dist > 7.0) {
+                    t.zielOffen = false;
+                }
+                
+                const zielWinkel = t.zielOffen ? -Math.PI/2 : 0;
+                const aktuellerWinkel = t.pivot.rotation.y;
+                const schritt = 0.16;
+                t.pivot.rotation.y += (zielWinkel - aktuellerWinkel) * schritt;
+                
+                const istOffen = Math.abs(zielWinkel - t.pivot.rotation.y) < 0.12;
+                if(istOffen && t.zielOffen) {
+                    t.offen = true;
+                    if(t.collisionAdded) {
+                        const index = weltKollisionsobjekte.indexOf(t.mesh);
+                        if(index !== -1) weltKollisionsobjekte.splice(index,1);
+                        t.collisionAdded = false;
+                    }
+                    if(dist < 5.2) meldung = '🚪 TÜR ÖFFNET SICH';
+                } else if(!t.zielOffen && Math.abs(t.pivot.rotation.y) < 0.12) {
+                    t.offen = false;
+                    if(!t.collisionAdded) {
+                        weltKollisionsobjekte.push(t.mesh);
+                        t.collisionAdded = true;
+                    }
+                }
+            }
+            
+            // Nur anzeigen, wenn gerade eine Tür geöffnet wird.
+            const status = document.getElementById('cover-status');
+            if(meldung) {
+                status.innerText = meldung;
+                status.style.color = '#ffd54a';
+                clearTimeout(window.tuerMeldungsTimer);
+                window.tuerMeldungsTimer = setTimeout(() => {
+                    ausgebenUI();
+                }, 900);
+            }
         }
 
         function baueTreppe(x,z,hoehe,richtung=1) {
@@ -1013,6 +1077,9 @@
             velocity.applyQuaternion(camera.quaternion);
             velocity.y = 0;
             camera.position.addScaledVector(velocity, delta * 12);
+
+            // Türen öffnen/schließen automatisch, wenn der Spieler sich nähert.
+            aktualisiereTueren();
 
             // Gebäude haben echte Wände und Türen. Durch Wände kann man nicht laufen.
             korrigiereGebaeudeKollision(vorherX, vorherZ);
