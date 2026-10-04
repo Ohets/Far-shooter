@@ -393,7 +393,9 @@
             registriereWand(frontRechts);
             const rahmen=new THREE.Mesh(new THREE.BoxGeometry(tuerBreite,0.5,dicke),wandMat);
             rahmen.position.set(x,h-0.25,z+d/2);
-            registriereWand(rahmen);
+            // Der Bereich direkt über der Tür darf keine Kollisionsmaske haben.
+            // Dadurch wird die Türöffnung vollständig frei passierbar.
+            szenerieGruppe.add(rahmen);
 
             const dach=new THREE.Mesh(new THREE.BoxGeometry(w+0.5,0.35,d+0.5),dachMat);
             dach.position.set(x,h+0.18,z);
