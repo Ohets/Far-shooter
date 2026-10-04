@@ -20,6 +20,13 @@
         #look-stick { right: 40px; width: 100px; height: 100px; }
         #fire-btn { position: absolute; bottom: 160px; right: 50px; width: 70px; height: 70px; background: rgba(255, 0, 0, 0.6); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; pointer-events: auto; }
         #shop-btn { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); padding: 12px 24px; background: #FFD700; color: black; border-radius: 5px; pointer-events: auto; font-size: 16px; }
+        #level-btn { position: absolute; top: 70px; left: 10px; padding: 10px 16px; background: rgba(30,120,210,0.9); color: white; border-radius: 6px; pointer-events: auto; font-weight: bold; z-index: 5; }
+        #level-menu { display:none; position:absolute; top:5%; left:5%; width:90%; height:90%; background:rgba(8,12,14,0.96); border:2px solid #4aa3df; color:white; pointer-events:auto; padding:16px; box-sizing:border-box; overflow-y:auto; z-index:20; }
+        #level-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+        .level-card { background:linear-gradient(145deg,#263238,#111); border:1px solid #566; border-radius:8px; padding:12px; min-height:78px; }
+        .level-card button { margin-top:8px; width:100%; padding:9px; border:0; border-radius:5px; background:#2e8b57; color:white; font-weight:bold; }
+        .level-card small { color:#bfc8cc; }
+
 
         /* Shop Menu */
         #shop-menu { display: none; position: absolute; top: 10%; left: 10%; width: 80%; height: 80%; background: rgba(0,0,0,0.9); border: 2px solid #FFD700; color: white; pointer-events: auto; padding: 20px; box-sizing: border-box; overflow-y: auto; z-index: 10; }
@@ -47,7 +54,15 @@
     <div id="move-stick" class="joystick"></div>
     <div id="look-stick" class="joystick"></div>
     <div id="fire-btn" class="ui-element">FEUER</div>
+    <div id="level-btn">LEVEL</div>
     <div id="shop-btn">WAFFEN-SHOP</div>
+
+    <div id="level-menu">
+        <button class="close-btn" onclick="toggleLevelMenu()">X Schließen</button>
+        <h2>🎯 Level auswählen</h2>
+        <p>Wähle direkt eine der 10 Einsatzmissionen.</p>
+        <div id="level-grid"></div>
+    </div>
 
     <div id="shop-menu">
         <button class="close-btn" onclick="toggleShop()">X Schließen</button>
@@ -184,6 +199,11 @@
             }
 
             const daten = missionsSzenerien[(missionsNummer - 1) % missionsSzenerien.length];
+            const seed = missionsNummer * 7919;
+            function zufall(i) {
+                const x = Math.sin(seed + i * 127.1) * 43758.5453;
+                return x - Math.floor(x);
+            }
             scene.background = new THREE.Color(daten.himmel);
             scene.fog = new THREE.FogExp2(daten.himmel, daten.nebel);
 
@@ -217,7 +237,7 @@
                     trunk.position.y = 1.8;
                     crown.position.y = 5.5;
                     tree.add(trunk,crown);
-                    tree.position.set(Math.random()*230-115,0,Math.random()*230-115);
+                    tree.position.set(zufall(i)*230-115,0,Math.random()*230-115);
                     if(Math.abs(tree.position.x) < 13) tree.position.x += tree.position.x < 0 ? -20 : 20;
                     szenerieGruppe.add(tree);
                 }
@@ -229,7 +249,7 @@
                         new THREE.CylinderGeometry(0.08,0.14,5+Math.random()*5,6),
                         new THREE.MeshLambertMaterial({color:0x1f6b31})
                     );
-                    vine.position.set(Math.random()*220-110,3+Math.random()*3,Math.random()*220-110);
+                    vine.position.set(zufall(i+300)*220-110,3+Math.random()*3,Math.random()*220-110);
                     vine.rotation.z = (Math.random()-0.5)*0.7;
                     szenerieGruppe.add(vine);
                 }
@@ -255,7 +275,7 @@
                         new THREE.ConeGeometry(7+Math.random()*9,18+Math.random()*20,7),
                         new THREE.MeshLambertMaterial({color:0x8f999c})
                     );
-                    mountain.position.set(Math.random()*240-120,9,Math.random()*230-115);
+                    mountain.position.set(zufall(i+500)*240-120,9,Math.random()*230-115);
                     szenerieGruppe.add(mountain);
                 }
                 for(let i=0; i<55; i++) {
@@ -275,7 +295,7 @@
                         new THREE.BoxGeometry(5+Math.random()*6,h,5+Math.random()*6),
                         new THREE.MeshLambertMaterial({color:0x4c4d4a})
                     );
-                    building.position.set(Math.random()*210-105,h/2,Math.random()*210-105);
+                    building.position.set(zufall(i+700)*210-105,h/2,Math.random()*210-105);
                     if(Math.abs(building.position.x)<12) building.position.x += building.position.x<0?-20:20;
                     szenerieGruppe.add(building);
                 }
@@ -301,6 +321,46 @@
                 szenerieGruppe.add(lava);
             }
 
+            // Authentischere Landmarken und Deckungen je nach Einsatzgebiet.
+            if(daten.objekt === "urwald") {
+                for(let i=0;i<12;i++) {
+                    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.45,0.65,7,8), new THREE.MeshLambertMaterial({color:0x3b2818}));
+                    log.rotation.z = Math.PI/2;
+                    log.position.set(zufall(i+1000)*190-95,0.55,zufall(i+1100)*190-95);
+                    szenerieGruppe.add(log);
+                }
+            }
+            if(daten.objekt === "wueste") {
+                for(let i=0;i<10;i++) {
+                    const cactus = new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.5,2.8+zufall(i+1200)*2,7), new THREE.MeshLambertMaterial({color:0x3d6b35}));
+                    cactus.position.set(zufall(i+1300)*210-105,1.5,zufall(i+1400)*210-105);
+                    szenerieGruppe.add(cactus);
+                }
+            }
+            if(daten.objekt === "sumpf") {
+                for(let i=0;i<14;i++) {
+                    const pond = new THREE.Mesh(new THREE.CircleGeometry(2+zufall(i+1500)*3,20), new THREE.MeshLambertMaterial({color:0x244c42}));
+                    pond.rotation.x=-Math.PI/2;
+                    pond.position.set(zufall(i+1600)*210-105,0.035,zufall(i+1700)*210-105);
+                    szenerieGruppe.add(pond);
+                }
+            }
+            if(daten.objekt === "fels") {
+                for(let i=0;i<8;i++) {
+                    const cliff = new THREE.Mesh(new THREE.ConeGeometry(5+zufall(i+1800)*6,12+zufall(i+1900)*12,6), new THREE.MeshLambertMaterial({color:0x4a4540}));
+                    cliff.position.set(zufall(i+2000)*220-110,6,zufall(i+2100)*220-110);
+                    szenerieGruppe.add(cliff);
+                }
+            }
+            if(daten.objekt === "stadt") {
+                for(let i=0;i<10;i++) {
+                    const rubble = new THREE.Mesh(new THREE.BoxGeometry(2+zufall(i+2200)*3,0.7,2+zufall(i+2300)*3), new THREE.MeshLambertMaterial({color:0x3f403d}));
+                    rubble.position.set(zufall(i+2400)*210-105,0.35,zufall(i+2500)*210-105);
+                    rubble.rotation.y=zufall(i+2600)*Math.PI;
+                    szenerieGruppe.add(rubble);
+                }
+            }
+
             // Straße/Fluchtweg in jeder Mission, aber passend zur Umgebung.
             const road = new THREE.Mesh(
                 new THREE.PlaneGeometry(18,240),
@@ -323,7 +383,7 @@
                 const building = new THREE.Group();
                 building.add(base);
                 base.position.y = 1.1;
-                building.position.set(Math.random()*190-95,0,Math.random()*190-95);
+                building.position.set(zufall(i+900)*190-95,0,Math.random()*190-95);
                 szenerieGruppe.add(building);
             }
         }
@@ -592,6 +652,29 @@
                 }
             }
         }
+
+
+        function renderLevelMenu() {
+            const grid=document.getElementById('level-grid');
+            grid.innerHTML="";
+            missionsSzenerien.forEach((m,i)=>{
+                const card=document.createElement('div');
+                card.className='level-card';
+                card.innerHTML='<b>Level '+(i+1)+': '+m.name+'</b><br><small>Einsatzgebiet: '+m.name+'</small>';
+                const btn=document.createElement('button');
+                btn.textContent='LEVEL '+(i+1)+' STARTEN';
+                btn.onclick=function(){ spieler.mission=i+1; spieler.hp=100; starteMission(); toggleLevelMenu(); };
+                card.appendChild(btn);
+                grid.appendChild(card);
+            });
+        }
+        function toggleLevelMenu() {
+            const menu=document.getElementById('level-menu');
+            const open=menu.style.display==='block';
+            menu.style.display=open?'none':'block';
+            if(!open) renderLevelMenu();
+        }
+        document.getElementById('level-btn').addEventListener('click',toggleLevelMenu);
 
         function toggleShop() {
             const menu = document.getElementById('shop-menu');
