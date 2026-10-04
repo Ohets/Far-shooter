@@ -288,7 +288,7 @@
             }
         }
 
-        function baueTreppe(x,z,hoehe,richtung=1) {
+        function baueTreppe(x,z,hoehe,richtung=1,yBasis=0) {
             const treppe=new THREE.Group();
             const stufen=Math.max(6,Math.floor(hoehe/0.45));
             for(let i=0;i<stufen;i++) {
@@ -296,11 +296,11 @@
                     new THREE.BoxGeometry(2.4,0.35,1.0),
                     new THREE.MeshLambertMaterial({color:0x55514b})
                 );
-                stufe.position.set(x,0.25+i*0.42,z+richtung*i*0.72);
+                stufe.position.set(x,yBasis+0.25+i*0.42,z+richtung*i*0.72);
                 treppe.add(stufe);
             }
             szenerieGruppe.add(treppe);
-            begehbareTreppen.push({x,z,richtung,hoehe,breite:2.4,laenge:stufen*0.72});
+            begehbareTreppen.push({x,z,richtung,hoehe,breite:2.4,laenge:stufen*0.72,yBasis:yBasis});
         }
 
         function aktualisiereTreppen() {
@@ -309,7 +309,7 @@
                 const dz=(camera.position.z-t.z)*t.richtung;
                 if(Math.abs(dx)<t.breite/2 && dz>-0.5 && dz<t.laenge+0.5) {
                     const stufe=Math.max(0,Math.min(Math.floor(dz/0.72),Math.floor(t.hoehe/0.42)));
-                    camera.position.y=2+stufe*0.42;
+                    camera.position.y=2+t.yBasis+stufe*0.42;
                     return true;
                 }
             }
@@ -473,10 +473,7 @@
 
             // Innentreppe verbindet alle Stockwerke.
             for(let e=0;e<etagen-1;e++) {
-                baueTreppe(x-5.0,z-2.0+e*0.0,etagenHoehe,1);
-                // Die Treppen werden pro Etage optisch nach oben versetzt.
-                const treppe=begehbareTreppen[begehbareTreppen.length-1];
-                treppe.yBasis=e*etagenHoehe;
+                baueTreppe(x-5.0,z-2.0,etagenHoehe,1,e*etagenHoehe);
             }
 
             // Eingang vorne: breite Öffnung, damit der Spieler sicher hineinkommt.
