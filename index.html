@@ -247,6 +247,8 @@
             soldier.add(rifle);
 
             soldier.userData.parts = { body, head, helmet, uniformMat };
+            soldier.userData.parts.leftArm = soldier.children.find(x => x.geometry && x.geometry.type === "BoxGeometry" && x.position.x < -0.5);
+            soldier.userData.parts.rightArm = soldier.children.find(x => x.geometry && x.geometry.type === "BoxGeometry" && x.position.x > 0.5);
             return soldier;
         }
 
@@ -265,7 +267,9 @@
                     material: mesh.userData.parts.uniformMat,
                     hp: 100 + (spieler.mission * 20),
                     flashTimer: 0,
-                    attackCooldown: Math.random()*2
+                    attackCooldown: Math.random()*2,
+                    animTime: Math.random()*10,
+                    walkPhase: Math.random()*Math.PI*2
                 });
             }
             ausgebenUI();
@@ -305,7 +309,7 @@
             
             if(intersects.length > 0) {
                 let getroffenMesh = intersects[0].object;
-                let gegner = gegnerArray.find(g => g.mesh === getroffenMesh || g.mesh.children.includes(getroffenMesh) || g.mesh.getObjectById(getroffenMesh.id));
+                let gegner = gegnerArray.find(g => g.mesh === getroffenMesh || g.mesh.getObjectById(getroffenMesh.id));
                 
                 if(gegner) {
                     playHitSound();
@@ -412,7 +416,21 @@
                 // Treffer-Blinken zurücksetzen
                 if(g.flashTimer > 0) {
                     g.flashTimer -= delta;
-                    if(g.flashTimer <= 0) g.material.color.setHex(0xff0000);
+                    if(g.flashTimer <= 0) g.material.color.setHex(0x3d5137);
+                }
+
+                // Soldaten-Animation: Gehen und Angreifen
+                g.animTime += delta;
+                const walk = Math.sin(g.animTime * 7 + g.walkPhase) * 0.55;
+                const arms = g.mesh.children.filter(x => x.geometry && x.geometry.type === "BoxGeometry" && x.position.y > 1.4);
+                const legs = g.mesh.children.filter(x => x.geometry && x.geometry.type === "BoxGeometry" && x.position.y < 1);
+                if (arms.length >= 2) {
+                    arms[0].rotation.z = -0.22 + walk * 0.45;
+                    arms[1].rotation.z = 0.22 - walk * 0.45;
+                }
+                if (legs.length >= 2) {
+                    legs[0].rotation.x = walk * 0.65;
+                    legs[1].rotation.x = -walk * 0.65;
                 }
 
                 let richtung = new THREE.Vector3().subVectors(camera.position, g.mesh.position);
@@ -424,6 +442,10 @@
                     g.mesh.rotation.y = Math.atan2(richtung.x, richtung.z);
                 } else {
                     g.mesh.rotation.y = Math.atan2(richtung.x, richtung.z);
+                    if (arms.length >= 2) {
+                        arms[0].rotation.z = -0.75;
+                        arms[1].rotation.z = 0.75;
+                    }
                     g.attackCooldown -= delta;
                     if(g.attackCooldown <= 0) {
                         spieler.hp -= 4;
