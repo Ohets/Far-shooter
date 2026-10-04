@@ -223,9 +223,9 @@
                 breite:breite,
                 zielOffen:false,
                 offen:false,
-                collisionAdded:true
+                collisionAdded:false
             });
-            weltKollisionsobjekte.push(tuer);
+            // Die Tür selbst blockiert den Eingang nicht.
             return tuer;
         }
 
@@ -254,19 +254,10 @@
                 const istOffen = Math.abs(t.pivot.rotation.y) > 0.35;
                 if(istOffen && t.zielOffen) {
                     t.offen = true;
-                    if(t.collisionAdded) {
-                        const index = weltKollisionsobjekte.indexOf(t.mesh);
-                        if(index !== -1) weltKollisionsobjekte.splice(index,1);
-                        t.collisionAdded = false;
-                    }
                     if(dist < 5.2) meldung = '🚪 TÜR ÖFFNET SICH';
                 } else if(!t.zielOffen && Math.abs(t.pivot.rotation.y) < 0.12) {
                     t.offen = false;
                     t.pivot.rotation.y = 0;
-                    if(!t.collisionAdded) {
-                        weltKollisionsobjekte.push(t.mesh);
-                        t.collisionAdded = true;
-                    }
                 }
             }
             
