@@ -18,6 +18,7 @@
         .joystick { position: absolute; bottom: 40px; border-radius: 50%; background: rgba(255,255,255,0.2); pointer-events: auto; }
         #move-stick { left: 40px; width: 100px; height: 100px; }
         #look-stick { right: 40px; width: 100px; height: 100px; }
+        #jump-btn { position: absolute; bottom: 245px; right: 55px; width: 64px; height: 64px; background: rgba(40,150,255,0.65); border-radius: 50%; display:flex; align-items:center; justify-content:center; font-size:14px; pointer-events:auto; z-index:4; }
         #fire-btn { position: absolute; bottom: 160px; right: 50px; width: 70px; height: 70px; background: rgba(255, 0, 0, 0.6); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; pointer-events: auto; }
         #shop-btn { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); padding: 12px 24px; background: #FFD700; color: black; border-radius: 5px; pointer-events: auto; font-size: 16px; }
         #level-btn { position: absolute; top: 70px; left: 10px; padding: 10px 16px; background: rgba(30,120,210,0.9); color: white; border-radius: 6px; pointer-events: auto; font-weight: bold; z-index: 5; }
@@ -54,6 +55,7 @@
 
     <div id="move-stick" class="joystick"></div>
     <div id="look-stick" class="joystick"></div>
+    <div id="jump-btn" class="ui-element">SPRUNG</div>
     <div id="fire-btn" class="ui-element">FEUER</div>
     <div id="level-btn">LEVEL</div>
     <div id="shop-btn">WAFFEN-SHOP</div>
@@ -153,6 +155,19 @@
         
         let aktuelleWaffe = waffenListe[0];
         let spieler = { hp: 100, credits: 0, mission: 1, lastDamageTime: 0 };
+        let sprungHoehe = 2;
+        let sprungGeschwindigkeit = 0;
+        let istInDerLuft = false;
+        let sprungAusgeloest = false;
+
+        function springen() {
+            if(!istInDerLuft) {
+                sprungGeschwindigkeit = 7.5;
+                istInDerLuft = true;
+            }
+        }
+
+        document.getElementById("jump-btn").addEventListener("pointerdown", springen);
         
         // --- THREE.JS SETUP ---
         const scene = new THREE.Scene();
@@ -1083,7 +1098,20 @@
             const weltGrenze = 126;
             camera.position.x = Math.max(-weltGrenze, Math.min(weltGrenze, camera.position.x));
             camera.position.z = Math.max(-weltGrenze, Math.min(weltGrenze, camera.position.z));
-            if(!aktualisiereTreppen()) camera.position.y = 2;
+            const aufTreppe = aktualisiereTreppen();
+            if(!aufTreppe) {
+                // Einfache Schwerkraft und Sprungphysik, damit der Spieler nicht am Boden festklebt.
+                if(!istInDerLuft && camera.position.y <= sprungHoehe + 0.02) camera.position.y = sprungHoehe;
+                if(istInDerLuft) {
+                    sprungGeschwindigkeit -= 18 * delta;
+                    camera.position.y += sprungGeschwindigkeit * delta;
+                    if(camera.position.y <= sprungHoehe) {
+                        camera.position.y = sprungHoehe;
+                        sprungGeschwindigkeit = 0;
+                        istInDerLuft = false;
+                    }
+                }
+            }
 
             if(aktuellesZiel && aktuellesZiel.typ === "ueberleben" && !missionAbgeschlossen) {
                 zielZeit -= delta;
@@ -1363,6 +1391,7 @@
         }
 
         starteMission();
+        camera.position.y = sprungHoehe;
         animate();
 
         window.addEventListener('resize', () => {
