@@ -41,7 +41,7 @@
     
     <div id="mission-info" class="ui-element">
         Mission <span id="mission-num">1</span>/10<br>
-        Ziel: Eliminiere alle Gegner (<span id="enemy-count">0</span> übrig)
+        Ziel: <span id="objective-text">Eliminiere alle Gegner</span>
     </div>
 
     <div id="move-stick" class="joystick"></div>
@@ -225,6 +225,15 @@
 
         // --- SOLDATEN / GEGNER SYSTEM ---
         let gegnerArray = [];
+        const missionsziele = [
+            {typ:"eliminieren", name:"Eliminiere alle Gegner"},
+            {typ:"ueberleben", name:"Überlebe den Angriff für"},
+            {typ:"erreichen", name:"Erreiche den markierten Bereich"}
+        ];
+        let aktuellesZiel = null;
+        let zielZeit = 0;
+        let zielZone = null;
+        let missionAbgeschlossen = false;
 
         function erstelleSoldat() {
             const soldier = new THREE.Group();
@@ -245,6 +254,7 @@
             helmet.position.y = 2.95;
             soldier.add(helmet);
 
+            let leftLeg, rightLeg, leftArm, rightArm;
             for(const side of [-1,1]) {
                 const leg = new THREE.Mesh(new THREE.BoxGeometry(0.38, 1.35, 0.42), darkMat);
                 leg.position.set(side*0.3, 0.55, 0);
@@ -253,6 +263,8 @@
                 arm.position.set(side*0.82, 1.75, 0);
                 arm.rotation.z = side * 0.22;
                 soldier.add(arm);
+                if(side === -1) { leftLeg = leg; leftArm = arm; }
+                else { rightLeg = leg; rightArm = arm; }
             }
 
             // Gewehr in den Händen
@@ -262,15 +274,9 @@
             soldier.add(rifle);
 
             // Explizite Körperteile für saubere Animationen
-            const legs = soldier.children.filter(x => x !== body && x.geometry && x.geometry.type === "BoxGeometry" && x.position.y < 1);
-            const arms = soldier.children.filter(x => x !== body && x.geometry && x.geometry.type === "BoxGeometry" && x.position.y > 1.4);
             soldier.userData.parts = {
                 body, head, helmet, uniformMat,
-                leftLeg: legs[0],
-                rightLeg: legs[1],
-                leftArm: arms[0],
-                rightArm: arms[1],
-                rifle
+                leftLeg, rightLeg, leftArm, rightArm, rifle
             };
             soldier.userData.parts.leftLeg.name = "leftLeg";
             soldier.userData.parts.rightLeg.name = "rightLeg";
@@ -308,7 +314,9 @@
                     spawnPosition: mesh.position.clone(),
                     strafeDir: Math.random() < 0.5 ? -1 : 1,
                     strafeTimer: 1 + Math.random()*2,
-                    lastPlayerShot: 0
+                    lastPlayerShot: 0,
+                    shootAnimTime: 0,
+                    shootRecoil: 0
                 });
             }
             ausgebenUI();
@@ -369,24 +377,86 @@
             ausgebenUI();
         }
 
-        function ueberpruefeMission() {
-            if(gegnerArray.length === 0) {
-                playWinSound();
-                if(spieler.mission < 10) {
-                    spieler.mission++;
-                    alert(`Mission ${spieler.mission - 1} abgeschlossen! Belohnung: 200$. Nächste Mission startet.`);
-                    spieler.credits += 200;
+        function neuesMissionsziel() {
+            missionAbgeschlossen = false;
+            if(zielZone) {
+                scene.remove(zielZone);
+                zielZone = null;
+            }
+
+            aktuellesZiel = missionsziele[(spieler.mission - 1) % missionsziele.length];
+
+            if(aktuellesZiel.typ === "ueberleben") {
+                zielZeit = 18 + spieler.mission * 3;
+            }
+
+            if(aktuellesZiel.typ === "erreichen") {
+                const zone = new THREE.Group();
+                const ring = new THREE.Mesh(
+                    new THREE.RingGeometry(4, 5, 32),
+                    new THREE.MeshBasicMaterial({color:0x00ff66, side:THREE.DoubleSide, transparent:true, opacity:0.75})
+                );
+                ring.rotation.x = -Math.PI / 2;
+                const beacon = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.18, 0.18, 6, 8),
+                    new THREE.MeshBasicMaterial({color:0x00ff66})
+                );
+                beacon.position.y = 3;
+                zone.add(ring, beacon);
+                zone.position.set(Math.random()*170-85, 0.04, Math.random()*170-85);
+                zielZone = zone;
+                scene.add(zone);
+            }
+            ausgebenUI();
+        }
+
+        function missionErfolgreich() {
+            if(missionAbgeschlossen) return;
+            missionAbgeschlossen = true;
+            playWinSound();
+            spieler.credits += 200;
+            const alteMission = spieler.mission;
+
+            if(spieler.mission < 10) {
+                spieler.mission++;
+                setTimeout(() => {
+                    alert("Mission " + alteMission + " abgeschlossen! +200$. Neues Missionsziel: " + missionsziele[(spieler.mission - 1) % missionsziele.length].name + ".");
                     starteMission();
-                } else {
-                    alert("Herzlichen Glückwunsch! Du hast das Spiel komplett durchgespielt!");
+                }, 50);
+            } else {
+                setTimeout(() => {
+                    alert("Glückwunsch! Alle 10 Missionen geschafft! +200$. Die Kampagne beginnt erneut.");
                     spieler.mission = 1;
                     starteMission();
-                }
+                }, 50);
+            }
+        }
+
+        function ueberpruefeMission() {
+            if(!aktuellesZiel || missionAbgeschlossen) return;
+
+            if(aktuellesZiel.typ === "eliminieren" && gegnerArray.length === 0) {
+                missionErfolgreich();
+            }
+
+            if(aktuellesZiel.typ === "ueberleben" && zielZeit <= 0) {
+                missionErfolgreich();
+            }
+
+            if(aktuellesZiel.typ === "erreichen" && zielZone) {
+                const d = camera.position.distanceTo(zielZone.position);
+                if(d < 5.5) missionErfolgreich();
             }
         }
 
         function starteMission() {
-            erstelleGegner(2 + spieler.mission);
+            if(zielZone) {
+                scene.remove(zielZone);
+                zielZone = null;
+            }
+            const gegnerAnzahl = 2 + spieler.mission;
+            erstelleGegner(gegnerAnzahl);
+            neuesMissionsziel();
         }
 
         function ausgebenUI() {
@@ -394,7 +464,16 @@
             document.getElementById('credits-val').innerText = spieler.credits;
             document.getElementById('weapon-val').innerText = aktuelleWaffe.name;
             document.getElementById('mission-num').innerText = spieler.mission;
-            document.getElementById('enemy-count').innerText = gegnerArray.length;
+            if(aktuellesZiel) {
+                if(aktuellesZiel.typ === "ueberleben") {
+                    const rest = Math.max(0, Math.ceil(zielZeit));
+                    document.getElementById('objective-text').innerText = aktuellesZiel.name + " " + rest + "s";
+                } else if(aktuellesZiel.typ === "eliminieren") {
+                    document.getElementById('objective-text').innerText = aktuellesZiel.name + " (" + gegnerArray.length + " übrig)";
+                } else {
+                    document.getElementById('objective-text').innerText = aktuellesZiel.name;
+                }
+            }
         }
 
         function toggleShop() {
@@ -460,6 +539,18 @@
             velocity.y = 0;
             camera.position.addScaledVector(velocity, delta * 12);
 
+            // Unsichtbare Grenzen der Spielwelt: der Spieler kann die Szenerie nicht verlassen.
+            const weltGrenze = 126;
+            camera.position.x = Math.max(-weltGrenze, Math.min(weltGrenze, camera.position.x));
+            camera.position.z = Math.max(-weltGrenze, Math.min(weltGrenze, camera.position.z));
+            camera.position.y = 2;
+
+            if(aktuellesZiel && aktuellesZiel.typ === "ueberleben" && !missionAbgeschlossen) {
+                zielZeit -= delta;
+            }
+
+            ueberpruefeMission();
+
             gegnerArray.forEach(g => {
                 // Treffer-Blinken zurücksetzen
                 if(g.flashTimer > 0) {
@@ -491,7 +582,7 @@
                         scene.remove(g.mesh);
                         gegnerArray = gegnerArray.filter(x => x !== g);
                         spieler.credits += 50 * spieler.mission;
-                        ueberpruefeMission();
+                        if(aktuellesZiel && aktuellesZiel.typ === "eliminieren") ueberpruefeMission();
                     }
                     return;
                 }
@@ -592,7 +683,9 @@
                         const cooldownBase = g.verhalten === "scharfschuetze" ? 2.2 :
                                              g.verhalten === "angreifer" ? 1.0 : 1.5;
                         g.shotCooldown = cooldownBase + Math.random()*1.2;
-                        g.muzzleTime = 0.10;
+                        g.muzzleTime = 0.16;
+                        g.shootAnimTime = 0.16;
+                        g.shootRecoil = 0;
                         playShootSound();
 
                         const flash = new THREE.Mesh(
@@ -603,7 +696,12 @@
                         g.mesh.add(flash);
                         g.muzzleFlash = flash;
 
-                        if(parts.rifle) parts.rifle.position.z = -0.9;
+                        if(parts.rifle) parts.rifle.position.z = -0.94;
+                        // sichtbare Schussbewegung: Arme ziehen die Waffe kurz zurück
+                        if(parts.leftArm && parts.rightArm) {
+                            parts.leftArm.rotation.z = -0.82;
+                            parts.rightArm.rotation.z = 0.82;
+                        }
 
                         // Trefferchance abhängig vom Soldatentyp und der Entfernung.
                         const accuracyBase = g.verhalten === "scharfschuetze" ? 0.88 :
@@ -631,6 +729,17 @@
                                     }
                                 }, 250);
                             }
+                        }
+                    }
+
+                    if(g.shootAnimTime > 0) {
+                        g.shootAnimTime -= delta;
+                        const p = Math.max(0, g.shootAnimTime / 0.16);
+                        const kick = Math.sin((1 - p) * Math.PI) * 0.18;
+                        if(parts.rifle) parts.rifle.position.z = -0.75 - kick;
+                        if(parts.leftArm && parts.rightArm) {
+                            parts.leftArm.rotation.z = -0.72 - kick * 0.7;
+                            parts.rightArm.rotation.z = 0.72 + kick * 0.7;
                         }
                     }
 
