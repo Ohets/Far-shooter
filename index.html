@@ -248,7 +248,10 @@
                 const schritt = 0.16;
                 t.pivot.rotation.y += (zielWinkel - aktuellerWinkel) * schritt;
                 
-                const istOffen = Math.abs(zielWinkel - t.pivot.rotation.y) < 0.12;
+                // Sobald die Tür nur ein Stück geöffnet ist, wird sie bereits
+                // aus der Kollision entfernt. Dadurch kann der Spieler sicher
+                // durch die komplette Türöffnung laufen.
+                const istOffen = Math.abs(t.pivot.rotation.y) > 0.35;
                 if(istOffen && t.zielOffen) {
                     t.offen = true;
                     if(t.collisionAdded) {
@@ -259,6 +262,7 @@
                     if(dist < 5.2) meldung = '🚪 TÜR ÖFFNET SICH';
                 } else if(!t.zielOffen && Math.abs(t.pivot.rotation.y) < 0.12) {
                     t.offen = false;
+                    t.pivot.rotation.y = 0;
                     if(!t.collisionAdded) {
                         weltKollisionsobjekte.push(t.mesh);
                         t.collisionAdded = true;
