@@ -268,7 +268,52 @@
             }
         }
 
-        // Begehbare Versteck-Gebäude für alle Einsatzgebiete außer der bereits bebauten Ruinenstadt.\n        function baueVersteckGebaeude(x, z, w, d, h, farbe, dachFarbe) {\n            const wandMat = new THREE.MeshLambertMaterial({color:farbe});\n            const dachMat = new THREE.MeshLambertMaterial({color:dachFarbe});\n            const bodenMat = new THREE.MeshLambertMaterial({color:0x343634});\n            const tuerBreite = Math.min(2.8, w * 0.34);\n            const dicke = 0.42;\n            const boden = new THREE.Mesh(new THREE.BoxGeometry(w,0.22,d),bodenMat);\n            boden.position.set(x,0.11,z);\n            szenerieGruppe.add(boden);\n\n            const links = new THREE.Mesh(new THREE.BoxGeometry(dicke,h,d),wandMat);\n            links.position.set(x-w/2,h/2,z);\n            registriereWand(links);\n            const rechts = links.clone();\n            rechts.position.x=x+w/2;\n            registriereWand(rechts);\n            const rueck = new THREE.Mesh(new THREE.BoxGeometry(w,h,dicke),wandMat);\n            rueck.position.set(x,h/2,z-d/2);\n            registriereWand(rueck);\n\n            const segmentBreite=(w-tuerBreite)/2;\n            const frontLinks=new THREE.Mesh(new THREE.BoxGeometry(segmentBreite,h,dicke),wandMat);\n            frontLinks.position.set(x-(tuerBreite/2+segmentBreite/2),h/2,z+d/2);\n            registriereWand(frontLinks);\n            const frontRechts=frontLinks.clone();\n            frontRechts.position.x=x+(tuerBreite/2+segmentBreite/2);\n            registriereWand(frontRechts);\n            const rahmen=new THREE.Mesh(new THREE.BoxGeometry(tuerBreite,0.5,dicke),wandMat);\n            rahmen.position.set(x,h-0.25,z+d/2);\n            registriereWand(rahmen);\n\n            const dach=new THREE.Mesh(new THREE.BoxGeometry(w+0.5,0.35,d+0.5),dachMat);\n            dach.position.set(x,h+0.18,z);\n            szenerieGruppe.add(dach);\n\n            const kisteMat=new THREE.MeshLambertMaterial({color:0x5b4932});\n            for(let i=0;i<2;i++) {\n                const kiste=new THREE.Mesh(new THREE.BoxGeometry(1.5,1.0,1.5),kisteMat);\n                kiste.position.set(x-w*0.22+i*w*0.44,0.5,z-d*0.15);\n                szenerieGruppe.add(kiste);\n            }\n            baueTuer(x,0,z+d/2+0.08,tuerBreite,h,0);\n        }\n\n        const missionsSzenerien = [
+        // Begehbare Versteck-Gebäude für alle Einsatzgebiete außer der bereits bebauten Ruinenstadt.
+        function baueVersteckGebaeude(x, z, w, d, h, farbe, dachFarbe) {
+            const wandMat = new THREE.MeshLambertMaterial({color:farbe});
+            const dachMat = new THREE.MeshLambertMaterial({color:dachFarbe});
+            const bodenMat = new THREE.MeshLambertMaterial({color:0x343634});
+            const tuerBreite = Math.min(2.8, w * 0.34);
+            const dicke = 0.42;
+            const boden = new THREE.Mesh(new THREE.BoxGeometry(w,0.22,d),bodenMat);
+            boden.position.set(x,0.11,z);
+            szenerieGruppe.add(boden);
+
+            const links = new THREE.Mesh(new THREE.BoxGeometry(dicke,h,d),wandMat);
+            links.position.set(x-w/2,h/2,z);
+            registriereWand(links);
+            const rechts = links.clone();
+            rechts.position.x=x+w/2;
+            registriereWand(rechts);
+            const rueck = new THREE.Mesh(new THREE.BoxGeometry(w,h,dicke),wandMat);
+            rueck.position.set(x,h/2,z-d/2);
+            registriereWand(rueck);
+
+            const segmentBreite=(w-tuerBreite)/2;
+            const frontLinks=new THREE.Mesh(new THREE.BoxGeometry(segmentBreite,h,dicke),wandMat);
+            frontLinks.position.set(x-(tuerBreite/2+segmentBreite/2),h/2,z+d/2);
+            registriereWand(frontLinks);
+            const frontRechts=frontLinks.clone();
+            frontRechts.position.x=x+(tuerBreite/2+segmentBreite/2);
+            registriereWand(frontRechts);
+            const rahmen=new THREE.Mesh(new THREE.BoxGeometry(tuerBreite,0.5,dicke),wandMat);
+            rahmen.position.set(x,h-0.25,z+d/2);
+            registriereWand(rahmen);
+
+            const dach=new THREE.Mesh(new THREE.BoxGeometry(w+0.5,0.35,d+0.5),dachMat);
+            dach.position.set(x,h+0.18,z);
+            szenerieGruppe.add(dach);
+
+            const kisteMat=new THREE.MeshLambertMaterial({color:0x5b4932});
+            for(let i=0;i<2;i++) {
+                const kiste=new THREE.Mesh(new THREE.BoxGeometry(1.5,1.0,1.5),kisteMat);
+                kiste.position.set(x-w*0.22+i*w*0.44,0.5,z-d*0.15);
+                szenerieGruppe.add(kiste);
+            }
+            baueTuer(x,0,z+d/2+0.08,tuerBreite,h,0);
+        }
+
+        const missionsSzenerien = [
             {name:"Militärwald", boden:0x315f28, himmel:0x55738a, nebel:0.008, objekt:"wald"},
             {name:"Urwald", boden:0x164d20, himmel:0x3f6870, nebel:0.012, objekt:"urwald"},
             {name:"Wüste", boden:0x9b7a45, himmel:0xc99d68, nebel:0.006, objekt:"wueste"},
@@ -310,7 +355,25 @@
                 new THREE.MeshLambertMaterial({color:daten.boden})
             );
             floor.rotation.x = -Math.PI / 2;
-            szenerieGruppe.add(floor);\n\n            // Jedes Level bekommt eigene begehbare Gebäude zum Verstecken.\n            if(daten.objekt !== "stadt") {\n                const gebaeudeFarben = {\n                    wald:[0x3f493d,0x29302a], urwald:[0x4a3b2b,0x252d25],\n                    wueste:[0x8a6a45,0x51412f], schnee:[0x70797b,0x4b5355],\n                    sumpf:[0x3d4a3d,0x29332c], fels:[0x5a5149,0x373431],\n                    kueste:[0x566052,0x39463e], vulkan:[0x4b3f3b,0x282323],\n                    nacht:[0x26352c,0x171d1a]\n                };\n                const farben=gebaeudeFarben[daten.objekt] || [0x4b4b47,0x30302d];\n                const pos=[[-38,-34],[38,34],[-42,38]];\n                for(let i=0;i<pos.length;i++) {\n                    const px=pos[i][0]+(zufall(5000+i)-0.5)*8;\n                    const pz=pos[i][1]+(zufall(5100+i)-0.5)*8;\n                    baueVersteckGebaeude(px,pz,10+zufall(5200+i)*4,8+zufall(5300+i)*4,4.5+zufall(5400+i)*1.5,farben[0],farben[1]);\n                }\n            }
+            szenerieGruppe.add(floor);
+
+            // Jedes Level bekommt eigene begehbare Gebäude zum Verstecken.
+            if(daten.objekt !== "stadt") {
+                const gebaeudeFarben = {
+                    wald:[0x3f493d,0x29302a], urwald:[0x4a3b2b,0x252d25],
+                    wueste:[0x8a6a45,0x51412f], schnee:[0x70797b,0x4b5355],
+                    sumpf:[0x3d4a3d,0x29332c], fels:[0x5a5149,0x373431],
+                    kueste:[0x566052,0x39463e], vulkan:[0x4b3f3b,0x282323],
+                    nacht:[0x26352c,0x171d1a]
+                };
+                const farben=gebaeudeFarben[daten.objekt] || [0x4b4b47,0x30302d];
+                const pos=[[-38,-34],[38,34],[-42,38]];
+                for(let i=0;i<pos.length;i++) {
+                    const px=pos[i][0]+(zufall(5000+i)-0.5)*8;
+                    const pz=pos[i][1]+(zufall(5100+i)-0.5)*8;
+                    baueVersteckGebaeude(px,pz,10+zufall(5200+i)*4,8+zufall(5300+i)*4,4.5+zufall(5400+i)*1.5,farben[0],farben[1]);
+                }
+            }
 
             // Jede Mission bekommt einen anderen Grundaufbau.
             if(daten.objekt === "wald" || daten.objekt === "urwald" || daten.objekt === "sumpf" || daten.objekt === "nacht") {
