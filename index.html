@@ -213,6 +213,7 @@
 
         // Türen und Treppen für mehrstöckige, begehbare Gebäude.
         let begehbareTreppen = [];
+        let hochhausEtagenBoeden = [];
         let gebaeudeTuerObjekte = [];
 
         function baueTuer(x,y,z,breite=2.6,hoehe=2.8,rotationY=0) {
@@ -314,6 +315,23 @@
                 }
             }
             return false;
+        }
+
+        function findeEtagenBoden() {
+            let besterBoden = null;
+            for(const b of hochhausEtagenBoeden) {
+                if(Math.abs(camera.position.x - b.x) > b.w/2 - 0.45) continue;
+                if(Math.abs(camera.position.z - b.z) > b.d/2 - 0.45) continue;
+
+                const zielKameraY = b.oberkante + sprungHoehe;
+                // Nur einen Boden unterhalb bzw. knapp auf Höhe der Kamera verwenden.
+                if(zielKameraY <= camera.position.y + 0.35) {
+                    if(!besterBoden || b.oberkante > besterBoden.oberkante) {
+                        besterBoden = b;
+                    }
+                }
+            }
+            return besterBoden;
         }
 
         function spielerIstInGebaeude() {
@@ -424,11 +442,18 @@
             const bodenMat = new THREE.MeshLambertMaterial({color:0x292c2f});
             const dachMat = new THREE.MeshLambertMaterial({color:0x202326});
 
+            // Jede Etage bekommt einen echten begehbaren Boden. Die Böden
+            // werden zusätzlich für die Schwerkraft als Landeflächen registriert.
+            hochhausEtagenBoeden.push({x:x, z:z, w:w, d:d, oberkante:0.25});
+
             for(let e=0;e<etagen;e++) {
                 const y=e*etagenHoehe;
                 const boden=new THREE.Mesh(new THREE.BoxGeometry(w,0.25,d),bodenMat);
                 boden.position.set(x,y+0.12,z);
                 szenerieGruppe.add(boden);
+                if(e > 0) {
+                    hochhausEtagenBoeden.push({x:x, z:z, w:w, d:d, oberkante:y+0.25});
+                }
 
                 const links=new THREE.Mesh(new THREE.BoxGeometry(wandDicke,etagenHoehe,d),wandMat);
                 links.position.set(x-w/2,y+etagenHoehe/2,z);
@@ -502,6 +527,8 @@
         ];
 
         function baueSzenerie(missionsNummer) {
+            // Beim Wechsel der Mission alte Etagen-Bodeninformationen entfernen.
+            hochhausEtagenBoeden = [];
             weltKollisionsobjekte = [];
             begehbareTreppen = [];
             gebaeudeTuerObjekte = [];
@@ -1206,13 +1233,31 @@
             camera.position.z = Math.max(-weltGrenze, Math.min(weltGrenze, camera.position.z));
             const aufTreppe = aktualisiereTreppen();
             if(!aufTreppe) {
-                // Einfache Schwerkraft und Sprungphysik, damit der Spieler nicht am Boden festklebt.
-                if(!istInDerLuft && camera.position.y <= sprungHoehe + 0.02) camera.position.y = sprungHoehe;
+                // Böden der Hochhaus-Etagen tragen den Spieler, damit er auf
+                // jedem Stockwerk stehen und springen kann, ohne durchzufallen.
+                const etagenBoden = findeEtagenBoden();
+                const landHoehe = etagenBoden ? etagenBoden.oberkante + sprungHoehe : sprungHoehe;
+
+                if(!istInDerLuft) {
+                    if(etagenBoden && camera.position.y <= landHoehe + 0.35) {
+                        camera.position.y = landHoehe;
+                    } else if(!etagenBoden && camera.position.y > sprungHoehe + 0.08) {
+                        // Wenn der Spieler eine erhöhte Fläche verlässt, fällt er wieder.
+                        istInDerLuft = true;
+                        sprungGeschwindigkeit = Math.min(sprungGeschwindigkeit, 0);
+                    } else if(camera.position.y <= sprungHoehe + 0.02) {
+                        camera.position.y = sprungHoehe;
+                    }
+                }
+
                 if(istInDerLuft) {
                     sprungGeschwindigkeit -= 18 * delta;
                     camera.position.y += sprungGeschwindigkeit * delta;
-                    if(camera.position.y <= sprungHoehe) {
-                        camera.position.y = sprungHoehe;
+
+                    const aktuellerBoden = findeEtagenBoden();
+                    const bodenHoehe = aktuellerBoden ? aktuellerBoden.oberkante + sprungHoehe : sprungHoehe;
+                    if(camera.position.y <= bodenHoehe) {
+                        camera.position.y = bodenHoehe;
                         sprungGeschwindigkeit = 0;
                         istInDerLuft = false;
                     }
