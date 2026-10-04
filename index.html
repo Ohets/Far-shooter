@@ -246,9 +246,22 @@
             rifle.rotation.x = Math.PI/2;
             soldier.add(rifle);
 
-            soldier.userData.parts = { body, head, helmet, uniformMat };
-            soldier.userData.parts.leftArm = soldier.children.find(x => x.geometry && x.geometry.type === "BoxGeometry" && x.position.x < -0.5);
-            soldier.userData.parts.rightArm = soldier.children.find(x => x.geometry && x.geometry.type === "BoxGeometry" && x.position.x > 0.5);
+            // Explizite Körperteile für saubere Animationen
+            const legs = soldier.children.filter(x => x !== body && x.geometry && x.geometry.type === "BoxGeometry" && x.position.y < 1);
+            const arms = soldier.children.filter(x => x !== body && x.geometry && x.geometry.type === "BoxGeometry" && x.position.y > 1.4);
+            soldier.userData.parts = {
+                body, head, helmet, uniformMat,
+                leftLeg: legs[0],
+                rightLeg: legs[1],
+                leftArm: arms[0],
+                rightArm: arms[1],
+                rifle
+            };
+            soldier.userData.parts.leftLeg.name = "leftLeg";
+            soldier.userData.parts.rightLeg.name = "rightLeg";
+            soldier.userData.parts.leftArm.name = "leftArm";
+            soldier.userData.parts.rightArm.name = "rightArm";
+            soldier.userData.parts.rifle.name = "rifle";
             return soldier;
         }
 
@@ -269,7 +282,11 @@
                     flashTimer: 0,
                     attackCooldown: Math.random()*2,
                     animTime: Math.random()*10,
-                    walkPhase: Math.random()*Math.PI*2
+                    walkPhase: Math.random()*Math.PI*2,
+                    dying: false,
+                    deathTime: 0,
+                    muzzleTime: 0,
+                    shotCooldown: 1.5 + Math.random()*2
                 });
             }
             ausgebenUI();
@@ -302,6 +319,8 @@
 
         function feuerWaffe() {
             playShootSound();
+            // Kleine Rückstoßanimation der Kamera
+            rotationX = Math.min(Math.PI/3, rotationX + 0.025);
             const raycaster = new THREE.Raycaster();
             raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
             
@@ -317,11 +336,11 @@
                     gegner.mesh.userData.parts.uniformMat.color.setHex(0xffffff); // Treffer-Feedback
                     gegner.flashTimer = 0.1;
                     
-                    if(gegner.hp <= 0) {
-                        scene.remove(gegner.mesh);
-                        gegnerArray = gegnerArray.filter(g => g !== gegner);
-                        spieler.credits += 50 * spieler.mission;
-                        ueberpruefeMission();
+                    if(gegner.hp <= 0 && !gegner.dying) {
+                        // Todesanimation statt sofortigem Entfernen
+                        gegner.dying = true;
+                        gegner.deathTime = 0;
+                        gegner.mesh.userData.deathAwarded = false;
                     }
                 }
             }
@@ -419,18 +438,37 @@
                     if(g.flashTimer <= 0) g.material.color.setHex(0x3d5137);
                 }
 
-                // Soldaten-Animation: Gehen und Angreifen
+                // Soldaten-Animationen: Gehen, Zielen, Schießen und Sterben
                 g.animTime += delta;
+
+                const parts = g.mesh.userData.parts;
                 const walk = Math.sin(g.animTime * 7 + g.walkPhase) * 0.55;
-                const arms = g.mesh.children.filter(x => x.geometry && x.geometry.type === "BoxGeometry" && x.position.y > 1.4);
-                const legs = g.mesh.children.filter(x => x.geometry && x.geometry.type === "BoxGeometry" && x.position.y < 1);
-                if (arms.length >= 2) {
-                    arms[0].rotation.z = -0.22 + walk * 0.45;
-                    arms[1].rotation.z = 0.22 - walk * 0.45;
+
+                // Todesanimation: Soldat fällt nach hinten und sinkt leicht ab
+                if(g.dying) {
+                    g.deathTime += delta;
+                    const t = Math.min(g.deathTime / 0.65, 1);
+                    g.mesh.rotation.x = -t * Math.PI * 0.48;
+                    g.mesh.position.y = -0.45 * t;
+
+                    if(t >= 1 && !g.mesh.userData.deathAwarded) {
+                        g.mesh.userData.deathAwarded = true;
+                        scene.remove(g.mesh);
+                        gegnerArray = gegnerArray.filter(x => x !== g);
+                        spieler.credits += 50 * spieler.mission;
+                        ueberpruefeMission();
+                    }
+                    return;
                 }
-                if (legs.length >= 2) {
-                    legs[0].rotation.x = walk * 0.65;
-                    legs[1].rotation.x = -walk * 0.65;
+
+                // Laufanimation mit klaren Arm-/Beinbewegungen
+                if(parts.leftArm && parts.rightArm) {
+                    parts.leftArm.rotation.z = -0.22 + walk * 0.45;
+                    parts.rightArm.rotation.z = 0.22 - walk * 0.45;
+                }
+                if(parts.leftLeg && parts.rightLeg) {
+                    parts.leftLeg.rotation.x = walk * 0.65;
+                    parts.rightLeg.rotation.x = -walk * 0.65;
                 }
 
                 let richtung = new THREE.Vector3().subVectors(camera.position, g.mesh.position);
@@ -442,10 +480,52 @@
                     g.mesh.rotation.y = Math.atan2(richtung.x, richtung.z);
                 } else {
                     g.mesh.rotation.y = Math.atan2(richtung.x, richtung.z);
-                    if (arms.length >= 2) {
-                        arms[0].rotation.z = -0.75;
-                        arms[1].rotation.z = 0.75;
+
+                    // Soldat nimmt das Gewehr in Anschlag
+                    if(parts.leftArm && parts.rightArm) {
+                        parts.leftArm.rotation.z = -0.72;
+                        parts.rightArm.rotation.z = 0.72;
                     }
+                    if(parts.leftLeg && parts.rightLeg) {
+                        parts.leftLeg.rotation.x = 0;
+                        parts.rightLeg.rotation.x = 0;
+                    }
+
+                    // Schussanimation mit Mündungsfeuer
+                    g.shotCooldown -= delta;
+                    if(g.shotCooldown <= 0) {
+                        g.shotCooldown = 1.5 + Math.random()*1.5;
+                        g.muzzleTime = 0.09;
+                        playShootSound();
+
+                        const flash = new THREE.Mesh(
+                            new THREE.SphereGeometry(0.13, 6, 6),
+                            new THREE.MeshBasicMaterial({color: 0xffcc55})
+                        );
+                        flash.position.set(0.52, 1.65, -1.72);
+                        g.mesh.add(flash);
+                        g.muzzleFlash = flash;
+
+                        // kurzer Waffen-Rückstoß
+                        if(parts.rifle) parts.rifle.position.z = -0.9;
+                    }
+
+                    if(g.muzzleTime > 0) {
+                        g.muzzleTime -= delta;
+                        if(g.muzzleFlash) {
+                            g.muzzleFlash.scale.setScalar(1 + Math.random()*0.7);
+                            g.muzzleFlash.visible = true;
+                        }
+                        if(g.muzzleTime <= 0) {
+                            if(g.muzzleFlash) {
+                                g.mesh.remove(g.muzzleFlash);
+                                g.muzzleFlash = null;
+                            }
+                            if(parts.rifle) parts.rifle.position.z = -0.75;
+                        }
+                    }
+
+                    // Nahkampfangriff bleibt erhalten
                     g.attackCooldown -= delta;
                     if(g.attackCooldown <= 0) {
                         spieler.hp -= 4;
