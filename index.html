@@ -2359,14 +2359,15 @@
             }
 
             if(spieler.mission===2){
-                // Level 2: die Eskorte steht wirklich direkt beim Panzer.
+                // Level 2: Die Soldaten versperren den Ausgang und bewachen das Zielgebiet,
+                // statt direkt am Panzer zu stehen.
                 const wachen2=[
-                    [-7,-3],[-5,4],[0,-7],[6,-5],[8,2],
-                    [-8,2],[-4,7],[3,8],[8,6]
+                    [-9,-1],[-7,3],[-4,-1],[-1,3],[2,-1],[5,3],[8,-1],
+                    [-3,-6],[3,-6]
                 ];
                 wachen2.forEach((p,i)=>{
                     const mesh=erstelleSoldat();
-                    mesh.position.set(panzerPosition.x+p[0],0,panzerPosition.z+p[1]);
+                    mesh.position.set(panzerZielPosition.x+p[0],0,panzerZielPosition.z+p[1]);
                     mesh.rotation.y=Math.atan2(panzerPosition.x-mesh.position.x,panzerPosition.z-mesh.position.z);
                     scene.add(mesh);
                     const verhalten=(i%4===0) ? "scharfschuetze" : "verteidiger";
@@ -2387,7 +2388,7 @@
                         strafeTimer:1+Math.random()*2,
                         lastPlayerShot:0, shootAnimTime:0, shootRecoil:0,
                         entdeckt:false, entdeckungsZeit:0,
-                        schutzpunkt:panzerPosition.clone(),
+                        schutzpunkt:panzerZielPosition.clone(),
                         festerPosten:false
                     });
                 });
