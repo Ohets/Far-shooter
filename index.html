@@ -1747,6 +1747,7 @@
                 camera.position.set(flugzeugObjekt.position.x-5,Math.max(2,flugzeugObjekt.position.y+1.5),flugzeugObjekt.position.z);
                 rotationX=0; rotationY=flugzeugObjekt.rotation.y;
                 moveInput={x:0,y:0}; lookInput={x:0,y:0}; planeThrottleInput=0.18;
+                if(typeof flugzeugVelocity!==\"undefined\") flugzeugVelocity.set(0,0,0);
                 return;
             }
             if(camera.position.distanceTo(flugzeugObjekt.position)>7) return;
@@ -1754,66 +1755,179 @@
             moveInput={x:0,y:0}; lookInput={x:0,y:0};
             flugzeugPitch=0; flugzeugGeschwindigkeit=0; flugzeugObjekt.rotation.z=0;
             planeThrottleInput=0.18;
+            if(typeof flugzeugVelocity!==\"undefined\") flugzeugVelocity.set(0,0,0);
             const startQ=new THREE.Quaternion().setFromEuler(new THREE.Euler(0,flugzeugObjekt.rotation.y,0,'YXZ'));
             camera.position.copy(flugzeugObjekt.position).add(new THREE.Vector3(-12,4.8,0).applyQuaternion(startQ));
             camera.lookAt(flugzeugObjekt.position.clone().add(new THREE.Vector3(18,1,0).applyQuaternion(startQ)));
             rotationX=0; rotationY=flugzeugObjekt.rotation.y;
         }
 
+        // Flugphysik-Zustände
+        let flugzeugVelocity=new THREE.Vector3();
+        let flugzeugAuftrieb=0;
+        let flugzeugStall=false;
+
         function aktualisiereFlugzeug(delta){
             if(spieler.mission!==4 || !flugzeugObjekt || !spielerImFlugzeug) return;
 
-            // Turboprop-artige Steuerung:
-            // linker Stick = Pitch + Roll
-            // SCHUB-Slider = Geschwindigkeit
-            // rechter Stick links/rechts = Seitenruder
             const deadZone=0.08;
             const smoothInput=(v)=>{
                 if(Math.abs(v)<deadZone) return 0;
                 return Math.sign(v)*(Math.abs(v)-deadZone)/(1-deadZone);
             };
-            const rollInput=smoothInput(moveInput.x);
+
+            // Links/Rechts bewusst umgekehrt:
+            // Stick links -> Flugzeug rollt/steuert nach links.
+            // Stick rechts -> Flugzeug rollt/steuert nach rechts.
+            const rollInput=-smoothInput(moveInput.x);
             const pitchInput=smoothInput(moveInput.y);
-            const rudderInput=smoothInput(lookInput.x);
+            const rudderInput=-smoothInput(lookInput.x);
 
-            const zielGeschwindigkeit=planeThrottleInput*55;
-            flugzeugGeschwindigkeit=THREE.MathUtils.lerp(flugzeugGeschwindigkeit,zielGeschwindigkeit,Math.min(1,delta*2.4));
+            // --- REALISTISCHERE FLUGPHYSIK ---
+            // Das Flugzeug fliegt entlang seiner lokalen X-Achse.
+            // Deshalb ist rotation.z = Pitch, rotation.x = Roll, rotation.y = Yaw.
+            const pitchRate=0.95;
+            const rollRate=1.75;
+            const rudderRate=0.42;
 
-            // Stick nach unten = Nase hoch, nach oben = Nase runter.
-            if(flugzeugObjekt.position.y>2.9 || pitchInput>0.05){
-                flugzeugPitch += pitchInput*0.78*delta;
-                flugzeugPitch=Math.max(-0.58,Math.min(0.58,flugzeugPitch));
-            }
+            // Steuerflächen haben Trägheit statt sofortiger Richtungsänderung.
+            const zielRoll=rollInput*0.82;
+            flugzeugObjekt.rotation.x=THREE.MathUtils.lerp(
+                flugzeugObjekt.rotation.x,zielRoll,Math.min(1,delta*4.5)
+            );
 
-            flugzeugObjekt.rotation.z=THREE.MathUtils.lerp(flugzeugObjekt.rotation.z,-rollInput*0.72,Math.min(1,delta*5.5));
-            flugzeugObjekt.rotation.y += (rollInput*0.78 + rudderInput*0.24)*delta;
+            // Nase hoch/runter
+            const zielPitch=flugzeugObjekt.rotation.z + pitchInput*pitchRate*delta;
+            flugzeugObjekt.rotation.z=THREE.MathUtils.clamp(zielPitch,-0.62,0.62);
 
-            if(flugzeugObjekt.position.y<=2.8){
-                flugzeugObjekt.position.y=2.8;
-                if(pitchInput>0.10 && flugzeugGeschwindigkeit>15) flugzeugPitch=Math.max(flugzeugPitch,0.08);
-                else flugzeugPitch=Math.min(flugzeugPitch,0);
-            }
+            // Seitenruder + Querneigung beeinflussen die Kurve.
+            const kurvenStaerke=0.32 + Math.min(Math.abs(flugzeugVelocity.length())/45,1)*0.55;
+            flugzeugObjekt.rotation.y += (
+                rudderInput*rudderRate + rollInput*kurvenStaerke
+            )*delta;
 
-            const q=new THREE.Quaternion().setFromEuler(new THREE.Euler(flugzeugPitch,flugzeugObjekt.rotation.y,flugzeugObjekt.rotation.z,'YXZ'));
+            // Schubregler -> Motorleistung. Der Schub ist nicht direkt die Geschwindigkeit.
+            const throttle=THREE.MathUtils.clamp(planeThrottleInput,0.05,1);
+            const speed=Math.max(flugzeugVelocity.length(),flugzeugGeschwindigkeit);
+
+            // Flugzeug-Vorwärtsrichtung aus den echten Flugzeugwinkeln.
+            const q=new THREE.Quaternion().setFromEuler(
+                new THREE.Euler(
+                    flugzeugObjekt.rotation.x,
+                    flugzeugObjekt.rotation.y,
+                    flugzeugObjekt.rotation.z,
+                    'YXZ'
+                )
+            );
             const vorwaerts=new THREE.Vector3(1,0,0).applyQuaternion(q);
-            if(flugzeugGeschwindigkeit>0.8) flugzeugObjekt.position.addScaledVector(vorwaerts,flugzeugGeschwindigkeit*delta);
+            const oben=new THREE.Vector3(0,1,0).applyQuaternion(q);
 
-            if(flugzeugObjekt.position.y<2.8){ flugzeugObjekt.position.y=2.8; flugzeugPitch=0; }
+            // Beim Einstieg vorhandene Geschwindigkeit sauber initialisieren.
+            if(flugzeugVelocity.length()<0.5){
+                flugzeugVelocity.copy(vorwaerts).multiplyScalar(1.5);
+            }
+
+            // Motor-Schub
+            const maxSchub=30;
+            const schub=throttle*maxSchub;
+
+            // Luftwiderstand steigt ungefähr quadratisch mit der Geschwindigkeit.
+            const drag=0.0105*speed*speed;
+            const dragForce=Math.min(drag,schub*0.82);
+
+            // Auftrieb: bei hoher Geschwindigkeit stark, bei niedriger Geschwindigkeit bricht er ein.
+            const stallSpeed=13;
+            const liftSpeed=Math.max(0,speed/stallSpeed);
+            const liftRatio=Math.min(liftSpeed*liftSpeed,3.8);
+
+            // Zu starke Nase hoch reduziert den effektiven Auftrieb.
+            const angleOfAttack=Math.abs(flugzeugObjekt.rotation.z);
+            const aoaFactor=Math.max(0.25,1-angleOfAttack/1.15);
+
+            // Querneigung verteilt den Auftrieb und lässt das Flugzeug sinken.
+            const bankFactor=Math.max(0.18,Math.cos(flugzeugObjekt.rotation.x));
+            const liftForce=9.81*liftRatio*aoaFactor*bankFactor*0.92;
+
+            flugzeugAuftrieb=liftForce;
+            flugzeugStall=(speed<stallSpeed && throttle<0.62);
+
+            // Kräfte anwenden: Schub, Widerstand, Auftrieb und Schwerkraft.
+            const beschleunigung=new THREE.Vector3();
+            beschleunigung.addScaledVector(vorwaerts,schub);
+            if(speed>0.01){
+                beschleunigung.addScaledVector(flugzeugVelocity,-dragForce/speed);
+            }
+
+            // Auftrieb zeigt entlang der Flugzeug-Hochachse.
+            beschleunigung.addScaledVector(oben,liftForce);
+
+            // Schwerkraft
+            beschleunigung.y-=9.81;
+
+            // Stall: bei zu wenig Geschwindigkeit verliert das Flugzeug deutlich Auftrieb.
+            if(flugzeugStall){
+                beschleunigung.y-=3.2;
+                flugzeugObjekt.rotation.z += 0.16*delta;
+            }
+
+            flugzeugVelocity.addScaledVector(beschleunigung,delta);
+
+            // Geschwindigkeit begrenzen, aber nicht künstlich auf eine feste Zahl setzen.
+            const maxSpeed=58;
+            if(flugzeugVelocity.length()>maxSpeed){
+                flugzeugVelocity.setLength(maxSpeed);
+            }
+
+            // Sehr langsames Rückwärtsrollen verhindern.
+            if(flugzeugVelocity.length()<0.8 && throttle<0.15){
+                flugzeugVelocity.multiplyScalar(0.92);
+            }
+
+            flugzeugObjekt.position.addScaledVector(flugzeugVelocity,delta);
+            flugzeugGeschwindigkeit=flugzeugVelocity.length();
+
+            // Boden: Landung/Startbahn.
+            if(flugzeugObjekt.position.y<2.8){
+                flugzeugObjekt.position.y=2.8;
+
+                // Auf dem Boden wird die vertikale Geschwindigkeit absorbiert.
+                if(flugzeugVelocity.y<0) flugzeugVelocity.y=0;
+
+                // Nur bei ausreichendem Schub und Nase hoch hebt der Jet wieder ab.
+                if(flugzeugGeschwindigkeit<12 || pitchInput<=0.05){
+                    flugzeugObjekt.rotation.z=THREE.MathUtils.lerp(
+                        flugzeugObjekt.rotation.z,0,Math.min(1,delta*3)
+                    );
+                }
+            }
+
             flugzeugObjekt.position.x=Math.max(-118,Math.min(118,flugzeugObjekt.position.x));
             flugzeugObjekt.position.z=Math.max(-118,Math.min(118,flugzeugObjekt.position.z));
 
-            // Aircombat-artige Chase-Kamera: verzögert und stabil hinter dem Flugzeug.
-            const zielKamera=flugzeugObjekt.position.clone().add(new THREE.Vector3(-12.5,4.8,0).applyQuaternion(q));
-            const blickZiel=flugzeugObjekt.position.clone().add(new THREE.Vector3(24,1,0).applyQuaternion(q));
+            // Aircombat-Chase-Kamera: folgt der tatsächlichen Fluglage.
+            const kameraQ=q.clone();
+            const zielKamera=flugzeugObjekt.position.clone().add(
+                new THREE.Vector3(-12.5,4.8,0).applyQuaternion(kameraQ)
+            );
+            const blickZiel=flugzeugObjekt.position.clone().add(
+                new THREE.Vector3(24,1,0).applyQuaternion(kameraQ)
+            );
+
             camera.position.lerp(zielKamera,Math.min(1,delta*4.8));
             const aktuelleBlickrichtung=camera.getWorldDirection(new THREE.Vector3());
-            const aktuellesBlickZiel=camera.position.clone().add(aktuelleBlickrichtung.multiplyScalar(20));
+            const aktuellesBlickZiel=camera.position.clone().add(
+                aktuelleBlickrichtung.multiplyScalar(20)
+            );
             aktuellesBlickZiel.lerp(blickZiel,Math.min(1,delta*5.5));
             camera.lookAt(aktuellesBlickZiel);
 
+            // Erfolgreiche Landung im sicheren Versteck.
             const d=flugzeugObjekt.position.distanceTo(flugzeugZielPosition);
             if(d<9 && flugzeugObjekt.position.y<7 && flugzeugGeschwindigkeit<18){
-                planeThrottleInput=0; flugzeugGeschwindigkeit=0; missionErfolgreich();
+                planeThrottleInput=0;
+                flugzeugVelocity.set(0,0,0);
+                flugzeugGeschwindigkeit=0;
+                missionErfolgreich();
             }
         }
 
