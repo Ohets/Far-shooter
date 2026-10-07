@@ -1499,6 +1499,8 @@
 
             const roof=new THREE.Mesh(new THREE.BoxGeometry(hw+1,0.6,hd+1),new THREE.MeshLambertMaterial({color:0x202629}));
             roof.position.y=hh+0.3; hangar.add(roof);
+    // Hangar zur Missionsszenerie hinzufügen, damit er an der Markierung sichtbar ist.
+    szenerieGruppe.add(hangar);
 
             // Deutliche Markierung des Hangars innerhalb der Außenmauer.
             const hangarMarker=new THREE.Group();
