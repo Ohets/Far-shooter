@@ -849,6 +849,101 @@
             {name:"Nachtbasis", boden:0x17251e, himmel:0x101a25, nebel:0.012, objekt:"nacht"}
         ];
 
+
+        // --- WACHTUERME ---
+        // Reine Szenerie: keine Kollisionsobjekte, damit die stabile Spielerbewegung erhalten bleibt.
+        function baueWachtuerme(missionsNummer) {
+            let positionen;
+            if(missionsNummer <= 5) {
+                positionen = [[-48,-42],[48,42]];
+            } else if(missionsNummer <= 8) {
+                positionen = [[-48,-42],[48,42],[48,-42]];
+            } else {
+                positionen = [[-48,-42],[48,42],[48,-42],[-48,42]];
+            }
+
+            positionen.forEach((pos, index) => {
+                const x = pos[0], z = pos[1];
+                const turm = new THREE.Group();
+
+                const stahlMat = new THREE.MeshLambertMaterial({color:0x343b3e});
+                const dunkelMat = new THREE.MeshLambertMaterial({color:0x202527});
+                const holzMat = new THREE.MeshLambertMaterial({color:0x51473c});
+
+                // Vier massive Stützen
+                [[-2.15,-2.15],[2.15,-2.15],[-2.15,2.15],[2.15,2.15]].forEach(p => {
+                    const st = new THREE.Mesh(new THREE.BoxGeometry(0.42,7.5,0.42), stahlMat);
+                    st.position.set(p[0],3.75,p[1]);
+                    st.castShadow = true;
+                    st.receiveShadow = true;
+                    turm.add(st);
+                });
+
+                // Plattform
+                const plattform = new THREE.Mesh(
+                    new THREE.BoxGeometry(5.8,0.42,5.8),
+                    holzMat
+                );
+                plattform.position.y = 7.5;
+                plattform.castShadow = true;
+                plattform.receiveShadow = true;
+                turm.add(plattform);
+
+                // Geländer
+                const gel = new THREE.Group();
+                const pfosten = [
+                    [-2.7,0,-2.7],[0,0,-2.7],[2.7,0,-2.7],
+                    [-2.7,0,2.7],[0,0,2.7],[2.7,0,2.7],
+                    [-2.7,0,-0.0],[2.7,0,0]
+                ];
+                pfosten.forEach(p => {
+                    const q = new THREE.Mesh(new THREE.BoxGeometry(0.16,1.25,0.16), dunkelMat);
+                    q.position.set(p[0],8.25,p[2]);
+                    q.castShadow = true;
+                    gel.add(q);
+                });
+                const quer = [
+                    [0,8.82,-2.7,5.6,0.14,0.14],
+                    [0,8.82,2.7,5.6,0.14,0.14],
+                    [-2.7,8.82,0,0.14,0.14,5.6],
+                    [2.7,8.82,0,0.14,0.14,5.6]
+                ];
+                quer.forEach(q => {
+                    const m = new THREE.Mesh(new THREE.BoxGeometry(q[3],q[4],q[5]), dunkelMat);
+                    m.position.set(q[0],q[1],q[2]);
+                    m.castShadow = true;
+                    gel.add(m);
+                });
+                turm.add(gel);
+
+                // Kleine Überdachung
+                const dach = new THREE.Mesh(
+                    new THREE.BoxGeometry(6.2,0.28,6.2),
+                    dunkelMat
+                );
+                dach.position.y = 10.25;
+                dach.castShadow = true;
+                turm.add(dach);
+
+                // Leiter an der Vorderseite
+                for(let y=1.0; y<=7.0; y+=1.0) {
+                    const rung = new THREE.Mesh(new THREE.BoxGeometry(1.2,0.14,0.14), dunkelMat);
+                    rung.position.set(0,y,2.42);
+                    rung.castShadow = true;
+                    turm.add(rung);
+                }
+                const holm1 = new THREE.Mesh(new THREE.BoxGeometry(0.14,7.0,0.14), dunkelMat);
+                holm1.position.set(-0.58,3.75,2.42);
+                turm.add(holm1);
+                const holm2 = holm1.clone();
+                holm2.position.x = 0.58;
+                turm.add(holm2);
+
+                turm.position.set(x,0,z);
+                szenerieGruppe.add(turm);
+            });
+        }
+
         function baueSzenerie(missionsNummer) {
             // Beim Wechsel der Mission alte Etagen-Bodeninformationen entfernen.
             hochhausEtagenBoeden = [];
@@ -877,6 +972,9 @@
             }
             scene.background = new THREE.Color(daten.himmel);
             scene.fog = new THREE.FogExp2(daten.himmel, daten.nebel);
+
+            // Taktische Wachtürme auf jeder Mission.
+            baueWachtuerme(missionsNummer);
 
             const floor = new THREE.Mesh(
                 new THREE.PlaneGeometry(260, 260),
@@ -1575,7 +1673,49 @@
                 zielZone = null;
             }
             const gegnerAnzahl = Math.min(16, 3 + spieler.mission + Math.floor(spieler.mission / 3));
+
             erstelleGegner(gegnerAnzahl);
+
+            // Stationäre Scharfschützen auf den Wachtürmen.
+            const turmPositionen = spieler.mission <= 5
+                ? [[-48,-42],[48,42]]
+                : spieler.mission <= 8
+                    ? [[-48,-42],[48,42],[48,-42]]
+                    : [[-48,-42],[48,42],[48,-42],[-48,42]];
+
+            turmPositionen.forEach((pos, index) => {
+                const mesh = erstelleSoldat();
+                mesh.position.set(pos[0], 7.5, pos[1]);
+                scene.add(mesh);
+
+                gegnerArray.push({
+                    mesh,
+                    material: mesh.userData.parts.uniformMat,
+                    hp: 145 + (spieler.mission * 32),
+                    maxHp: 145 + (spieler.mission * 32),
+                    flashTimer: 0,
+                    attackCooldown: 1,
+                    animTime: Math.random()*10,
+                    walkPhase: Math.random()*10,
+                    dying: false,
+                    deathTime: 0,
+                    muzzleTime: 0,
+                    shotCooldown: 1.2 + Math.random()*1.5,
+                    verhalten: "scharfschuetze",
+                    spawnPosition: mesh.position.clone(),
+                    strafeDir: 1,
+                    strafeTimer: 2,
+                    lastPlayerShot: 0,
+                    shootAnimTime: 0,
+                    shootRecoil: 0,
+                    entdeckt: false,
+                    entdeckungsZeit: 0,
+                    schutzpunkt: null,
+                    festerPosten: true,
+                    turmIndex: index
+                });
+            });
+
             neuesMissionsziel();
         }
 
@@ -1865,7 +2005,9 @@
                 // Verhalten 2: Scharfschütze - hält Abstand und schießt aus der Distanz
                 // Verhalten 3: Flanker - versucht seitlich um den Spieler herumzukommen
                 // Verhalten 4: Verteidiger - bleibt eher bei seinem Startgebiet und greift dort an
-                let ziel = new THREE.Vector3();
+                // Wachturm-Schützen bleiben auf ihrem festen Posten.
+                if(!g.festerPosten) {
+                    let ziel = new THREE.Vector3();
 
                 if(g.verhalten === "angreifer") {
                     ziel.copy(camera.position);
@@ -1916,6 +2058,8 @@
                         richtung.normalize();
                         g.mesh.position.addScaledVector(richtung, -delta * (0.90 + spieler.mission * 0.04));
                     }
+                }
+
                 }
 
                 // Erst nach der Entdeckung darf der Soldat den Spieler verfolgen.
