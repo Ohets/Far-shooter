@@ -228,7 +228,8 @@
             }
         }
 
-        erstelleRegen();
+        // Der Regen wird erst nach der Three.js-Szene initialisiert,
+        // damit Kamera und Szene bereits existieren.
 
         // Regen und Regengeräusch bleiben bei jedem Missionswechsel aktiv.
         function playWinSound() {
@@ -350,6 +351,9 @@
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        // Regen jetzt sicher initialisieren: scene und camera sind bereits erstellt.
+        erstelleRegen();
 
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
