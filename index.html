@@ -24,6 +24,8 @@
         #aim-btn.aktiv { background: rgba(40,140,255,0.9); border-color: #8fd3ff; }
         #shop-btn { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); padding: 12px 24px; background: #FFD700; color: black; border-radius: 5px; pointer-events: auto; font-size: 16px; }
         #level-btn { position: absolute; top: 70px; left: 10px; padding: 10px 16px; background: rgba(30,120,210,0.9); color: white; border-radius: 6px; pointer-events: auto; font-weight: bold; z-index: 5; }
+        #alarm-banner { display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); padding:14px 24px; background:rgba(170,0,0,0.92); border:2px solid #ff4b4b; color:white; font-size:22px; font-weight:bold; text-align:center; text-shadow:2px 2px 2px #000; z-index:30; pointer-events:none; animation: alarmPulse 0.65s infinite alternate; }
+        @keyframes alarmPulse { from { transform:translate(-50%,-50%) scale(1); } to { transform:translate(-50%,-50%) scale(1.05); } }
         #level-menu { display:none; position:absolute; top:5%; left:5%; width:90%; height:90%; background:rgba(8,12,14,0.96); border:2px solid #4aa3df; color:white; pointer-events:auto; padding:16px; box-sizing:border-box; overflow-y:auto; z-index:20; }
         #level-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
         .level-card { background:linear-gradient(145deg,#263238,#111); border:1px solid #566; border-radius:8px; padding:12px; min-height:78px; }
@@ -51,9 +53,10 @@
     </div>
     
     <div id="mission-info" class="ui-element">
-        Mission <span id="mission-num">1</span>/10<br>
+        Mission <span id="mission-num">1</span>/11<br>
         Ziel: <span id="objective-text">Eliminiere alle Gegner</span>
     </div>
+    <div id="alarm-banner">🚨 ALARM! 🚨<br><small>Alle Wachen greifen an!</small></div>
 
     <div id="move-stick" class="joystick"></div>
     <div id="look-stick" class="joystick"></div>
@@ -846,7 +849,8 @@
             {name:"Küste", boden:0x6b8060, himmel:0x4f88a5, nebel:0.006, objekt:"kueste"},
             {name:"Vulkanland", boden:0x352c29, himmel:0x493536, nebel:0.010, objekt:"vulkan"},
             {name:"Ruinenstadt", boden:0x55534e, himmel:0x6b7074, nebel:0.009, objekt:"stadt"},
-            {name:"Nachtbasis", boden:0x17251e, himmel:0x101a25, nebel:0.012, objekt:"nacht"}
+            {name:"Nachtbasis", boden:0x17251e, himmel:0x101a25, nebel:0.012, objekt:"nacht"},
+            {name:"Geiselrettung", boden:0x202820, himmel:0x182026, nebel:0.013, objekt:"geisel"}
         ];
 
 
@@ -939,29 +943,27 @@
                 holm2.position.x = 0.58;
                 turm.add(holm2);
 
-                // Breite Außentreppe mit Stufen – deutlich realistischer als die Leiter.
+                // Realistischere Außentreppe: unten weit vom Turm entfernt,
+                // oben exakt auf Höhe der Plattform.
                 const treppenMat = new THREE.MeshLambertMaterial({color:0x4a4036});
-                for(let stufe=0; stufe<12; stufe++) {
-                    const st = new THREE.Mesh(
-                        new THREE.BoxGeometry(2.6,0.24,0.75),
-                        treppenMat
-                    );
-                    st.position.set(0,0.32 + stufe*0.60,3.05 + stufe*0.46);
-                    st.rotation.x = 0;
-                    st.castShadow = true;
-                    st.receiveShadow = true;
+                const treppenStufen=12, treppenHoehe=7.2, treppenLauf=5.2;
+                for(let stufe=0; stufe<treppenStufen; stufe++) {
+                    const fortschritt=stufe/(treppenStufen-1);
+                    const st=new THREE.Mesh(new THREE.BoxGeometry(2.8,0.30,0.62),treppenMat);
+                    st.position.set(0,0.22+fortschritt*treppenHoehe,8.25-fortschritt*treppenLauf);
+                    st.castShadow=true; st.receiveShadow=true;
                     turm.add(st);
                 }
-                const treppenGel = new THREE.MeshLambertMaterial({color:0x24292b});
-                [-1.35,1.35].forEach(px => {
-                    const handlauf = new THREE.Mesh(
-                        new THREE.BoxGeometry(0.14,7.1,0.14),
-                        treppenGel
-                    );
-                    handlauf.position.set(px,3.65,5.55);
-                    handlauf.rotation.x = Math.atan2(7.2,5.5);
-                    handlauf.castShadow = true;
-                    turm.add(handlauf);
+                const treppenGel=new THREE.MeshLambertMaterial({color:0x24292b});
+                [-1.52,1.52].forEach(px=>{
+                    const wange=new THREE.Mesh(new THREE.BoxGeometry(0.16,7.45,0.18),treppenGel);
+                    wange.position.set(px,3.85,5.65);
+                    wange.rotation.x=Math.atan2(treppenHoehe,treppenLauf);
+                    wange.castShadow=true; turm.add(wange);
+                    const handlauf=new THREE.Mesh(new THREE.BoxGeometry(0.13,7.5,0.13),treppenGel);
+                    handlauf.position.set(px,4.35,5.65);
+                    handlauf.rotation.x=Math.atan2(treppenHoehe,treppenLauf);
+                    handlauf.castShadow=true; turm.add(handlauf);
                 });
 
                 // Zwei starke Suchscheinwerfer auf dem Turm.
@@ -994,6 +996,83 @@
                 turm.position.set(x,0,z);
                 szenerieGruppe.add(turm);
             });
+        }
+
+        let geiselZone=null;
+        let geiselAlarm=false;
+
+        function playAlarmSound(){
+            if(audioCtx.state==='suspended') audioCtx.resume();
+            const now=audioCtx.currentTime;
+            const osc=audioCtx.createOscillator(), gain=audioCtx.createGain();
+            osc.type='sawtooth';
+            osc.frequency.setValueAtTime(520,now);
+            osc.frequency.linearRampToValueAtTime(820,now+0.28);
+            osc.frequency.linearRampToValueAtTime(520,now+0.56);
+            gain.gain.setValueAtTime(0.0001,now);
+            gain.gain.linearRampToValueAtTime(0.22,now+0.03);
+            gain.gain.linearRampToValueAtTime(0.0001,now+0.62);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(now); osc.stop(now+0.64);
+        }
+
+        function baueGeiselSzenerie(){
+            const x=32,z=-30;
+            baueVersteckGebaeude(x,z,18,14,5.8,0x4b514a,0x252b28);
+            const barricadeMat=new THREE.MeshLambertMaterial({color:0x34383a});
+            [-3.5,3.5].forEach(px=>{
+                const pfosten=new THREE.Mesh(new THREE.BoxGeometry(0.35,2.0,0.35),barricadeMat);
+                pfosten.position.set(x+px,1.0,z+7.35);
+                pfosten.castShadow=true; szenerieGruppe.add(pfosten);
+            });
+            const schild=new THREE.Mesh(new THREE.BoxGeometry(2.6,0.9,0.12),new THREE.MeshLambertMaterial({color:0x202020}));
+            schild.position.set(x,2.55,z+7.35); szenerieGruppe.add(schild);
+            [-5.5,5.5].forEach(px=>{
+                const licht=new THREE.PointLight(0xffd27a,1.2,16);
+                licht.position.set(x+px,4.2,z+8); szenerieGruppe.add(licht);
+            });
+            const geisel=new THREE.Group();
+            const koerper=new THREE.Mesh(new THREE.BoxGeometry(0.75,1.45,0.5),new THREE.MeshLambertMaterial({color:0x536b7a}));
+            koerper.position.y=1.25;
+            const kopf=new THREE.Mesh(new THREE.SphereGeometry(0.30,10,8),new THREE.MeshLambertMaterial({color:0xc58b68}));
+            kopf.position.y=2.25;
+            const fesseln=new THREE.Mesh(new THREE.BoxGeometry(0.9,0.16,0.16),new THREE.MeshLambertMaterial({color:0x777777}));
+            fesseln.position.set(0,0.62,-0.02);
+            geisel.add(koerper,kopf,fesseln);
+            geisel.position.set(x,0,z-2.2); scene.add(geisel);
+            const ring=new THREE.Mesh(new THREE.RingGeometry(2.0,2.35,32),new THREE.MeshBasicMaterial({color:0xffcc33,side:THREE.DoubleSide,transparent:true,opacity:0.8}));
+            ring.rotation.x=-Math.PI/2;
+            geiselZone=new THREE.Group(); geiselZone.position.set(x,0,z-2.2);
+            geiselZone.add(ring); scene.add(geiselZone);
+            const beacon=new THREE.PointLight(0xffcc33,1.4,8);
+            beacon.position.set(0,2.8,0); geiselZone.add(beacon);
+        }
+
+        function fuegeGeiselWacheHinzu(x,z,index){
+            const mesh=erstelleSoldat(); mesh.position.set(x,0,z);
+            mesh.rotation.y=Math.atan2(-30-z,32-x); scene.add(mesh);
+            const hp=135+spieler.mission*25;
+            gegnerArray.push({
+                mesh, material:mesh.userData.parts.uniformMat, hp, maxHp:hp,
+                flashTimer:0, attackCooldown:1, animTime:Math.random()*10, walkPhase:Math.random()*10,
+                dying:false, deathTime:0, muzzleTime:0, shotCooldown:0.9+Math.random()*1.5,
+                verhalten:"verteidiger", spawnPosition:mesh.position.clone(),
+                strafeDir:index%2?1:-1, strafeTimer:1.5, lastPlayerShot:0,
+                shootAnimTime:0, shootRecoil:0, entdeckt:false, entdeckungsZeit:0,
+                schutzpunkt:null, geiselWache:true, geiselSichtReichweite:27, geiselSichtSchwelle:0.48
+            });
+        }
+
+        function alarmGeisel(){
+            if(geiselAlarm) return;
+            geiselAlarm=true; playAlarmSound();
+            const banner=document.getElementById('alarm-banner');
+            if(banner) banner.style.display='block';
+            aktuellesZiel={typ:"eliminieren",name:"ALARM! Eliminiere alle Bewacher"};
+            gegnerArray.forEach(g=>{
+                if(g.geiselWache){g.entdeckt=true;g.entdeckungsZeit=0;}
+            });
+            ausgebenUI();
         }
 
         function baueSzenerie(missionsNummer) {
@@ -1042,7 +1121,7 @@
             }
 
             // Jedes Level bekommt eigene begehbare Gebäude zum Verstecken.
-            if(daten.objekt !== "stadt") {
+            if(daten.objekt !== "stadt" && daten.objekt !== "geisel") {
                 const gebaeudeFarben = {
                     wald:[0x3f493d,0x29302a], urwald:[0x4a3b2b,0x252d25],
                     wueste:[0x8a6a45,0x51412f], schnee:[0x70797b,0x4b5355],
@@ -1058,6 +1137,8 @@
                     baueVersteckGebaeude(px,pz,10+zufall(5200+i)*4,8+zufall(5300+i)*4,4.5+zufall(5400+i)*1.5,farben[0],farben[1]);
                 }
             }
+
+            if(daten.objekt === "geisel") baueGeiselSzenerie();
 
             // Jede Mission bekommt einen anderen Grundaufbau.
             if(daten.objekt === "wald" || daten.objekt === "urwald" || daten.objekt === "sumpf" || daten.objekt === "nacht") {
@@ -1645,7 +1726,11 @@
                 zielZone = null;
             }
 
-            aktuellesZiel = missionsziele[(spieler.mission - 1) % missionsziele.length];
+            if(spieler.mission===11) {
+                aktuellesZiel={typ:"geisel",name:"Rette die Geisel – kein Alarm!"};
+            } else {
+                aktuellesZiel=missionsziele[(spieler.mission-1)%missionsziele.length];
+            }
 
             if(aktuellesZiel.typ === "ueberleben") {
                 zielZeit = 22 + spieler.mission * 4;
@@ -1683,10 +1768,10 @@
             spieler.credits += 200;
             const alteMission = spieler.mission;
 
-            if(spieler.mission < 10) {
+            if(spieler.mission < missionsSzenerien.length) {
                 spieler.mission++;
                 setTimeout(() => {
-                    alert("Mission " + alteMission + " abgeschlossen! +200$. Neues Missionsziel: " + missionsziele[(spieler.mission - 1) % missionsziele.length].name + ".");
+                    alert("Mission " + alteMission + " abgeschlossen! +200$. Neues Missionsziel: " + (spieler.mission===11 ? "Geiselrettung" : missionsziele[(spieler.mission-1)%missionsziele.length].name) + ".");
                     starteMission();
                 }, 50);
             } else {
@@ -1710,13 +1795,21 @@
             }
 
             if(aktuellesZiel.typ === "erreichen" && zielZone) {
-                const d = camera.position.distanceTo(zielZone.position);
-                if(d < 5.5) missionErfolgreich();
+                const d=camera.position.distanceTo(zielZone.position);
+                if(d<5.5) missionErfolgreich();
+            }
+            if(aktuellesZiel.typ === "geisel" && geiselZone && !geiselAlarm) {
+                const d=camera.position.distanceTo(geiselZone.position);
+                if(d<4.0) missionErfolgreich();
             }
         }
 
         function starteMission() {
             baueSzenerie(spieler.mission);
+            geiselAlarm=false;
+            const alarmBanner=document.getElementById('alarm-banner');
+            if(alarmBanner) alarmBanner.style.display='none';
+            if(geiselZone){scene.remove(geiselZone);geiselZone=null;}
             camera.position.set(0, 2, 0);
             rotationX = 0;
             rotationY = 0;
@@ -1724,9 +1817,12 @@
                 scene.remove(zielZone);
                 zielZone = null;
             }
-            const gegnerAnzahl = Math.min(16, 3 + spieler.mission + Math.floor(spieler.mission / 3));
-
+            const gegnerAnzahl=spieler.mission===11 ? 0 : Math.min(16,3+spieler.mission+Math.floor(spieler.mission/3));
             erstelleGegner(gegnerAnzahl);
+            if(spieler.mission===11){
+                [[24,-40],[32,-40],[40,-40],[21,-30],[43,-30],[24,-20],[32,-20],[40,-20],[27,-25],[37,-25]]
+                .forEach((p,i)=>fuegeGeiselWacheHinzu(p[0],p[1],i));
+            }
 
             // Stationäre Scharfschützen auf den Wachtürmen.
             const turmPositionen = spieler.mission <= 5
@@ -1765,7 +1861,10 @@
                     schutzpunkt: null,
                     festerPosten: true,
                     turmIndex: index,
-                    sniperIdlePhase: Math.random()*Math.PI*2
+                    sniperIdlePhase: Math.random()*Math.PI*2,
+                    geiselWache:spieler.mission===11,
+                    geiselSichtReichweite:42,
+                    geiselSichtSchwelle:0.40
                 });
             });
 
@@ -1986,7 +2085,21 @@
                 // Soldaten bleiben zunächst an ihrem Spawnpunkt.
                 // Sie entdecken den Spieler erst, wenn er in ihrer Sichtweite ist.
                 const erkennungReichweite = 42 + spieler.mission * 1.8;
-                if(!g.entdeckt && dist < erkennungReichweite) {
+                if(!g.entdeckt && g.geiselWache && dist<g.geiselSichtReichweite){
+                    const wachBlick=new THREE.Vector3(0,0,1).applyQuaternion(g.mesh.quaternion);
+                    wachBlick.y=0;
+                    if(wachBlick.lengthSq()>0.01) wachBlick.normalize();
+                    const zurSpieler=camera.position.clone().sub(g.mesh.position);
+                    zurSpieler.y=0;
+                    if(zurSpieler.lengthSq()>0.01) zurSpieler.normalize();
+                    const auge=g.mesh.position.clone(); auge.y+=1.45;
+                    const ziel=camera.position.clone(); ziel.y=1.4;
+                    if(istSichtkontakt(auge,ziel) && wachBlick.dot(zurSpieler)>g.geiselSichtSchwelle){
+                        g.entdeckt=true; g.entdeckungsZeit=0; alarmGeisel();
+                    }
+                }
+
+                if(!g.entdeckt && dist < erkennungReichweite && !g.geiselWache) {
                     const blickrichtung = new THREE.Vector3();
                     camera.getWorldDirection(blickrichtung);
                     blickrichtung.y = 0;
