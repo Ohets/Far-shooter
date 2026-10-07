@@ -849,6 +849,103 @@
             {name:"Nachtbasis", boden:0x17251e, himmel:0x101a25, nebel:0.012, objekt:"nacht"}
         ];
 
+        function baueWachtuerme(missionsNummer, daten, zufall) {
+            // Auf höheren Missionen erscheinen mehr und höher gelegene Scharfschützenposten.
+            const positionen = [
+                [-48, -42],
+                [48, 42]
+            ];
+            if(missionsNummer >= 6) positionen.push([48, -42]);
+            if(missionsNummer >= 9) positionen.push([-48, 42]);
+
+            positionen.forEach((pos, index) => {
+                const turm = new THREE.Group();
+                const hoehe = 7.5;
+                const plattform = 5.8;
+
+                const holz = daten.objekt === "wueste" ? 0x6b5135 :
+                             daten.objekt === "schnee" ? 0x586165 :
+                             daten.objekt === "vulkan" ? 0x3d3735 :
+                             daten.objekt === "nacht" ? 0x202823 : 0x4a4a42;
+                const metall = 0x252a28;
+
+                // Vier massive Stützen
+                for(const sx of [-1,1]) {
+                    for(const sz of [-1,1]) {
+                        const stutze = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.38, hoehe, 0.38),
+                            new THREE.MeshLambertMaterial({color:holz})
+                        );
+                        stutze.position.set(sx*2.2, hoehe/2, sz*2.2);
+                        turm.add(stutze);
+                    }
+                }
+
+                const deck = new THREE.Mesh(
+                    new THREE.BoxGeometry(5.6, 0.35, 5.6),
+                    new THREE.MeshLambertMaterial({color:holz})
+                );
+                deck.position.y = hoehe;
+                turm.add(deck);
+
+                // Geländer rund um die Plattform
+                const pfostenHoehe = 1.15;
+                for(const sx of [-1,1]) {
+                    for(const sz of [-1,1]) {
+                        const pfosten = new THREE.Mesh(
+                            new THREE.BoxGeometry(0.16, pfostenHoehe, 0.16),
+                            new THREE.MeshLambertMaterial({color:metall})
+                        );
+                        pfosten.position.set(sx*2.55, hoehe+pfostenHoehe/2, sz*2.55);
+                        turm.add(pfosten);
+                    }
+                }
+                for(const axis of ["x","z"]) {
+                    for(const side of [-1,1]) {
+                        const gel = new THREE.Mesh(
+                            new THREE.BoxGeometry(axis==="x" ? 5.25 : 0.16, 0.14, axis==="z" ? 5.25 : 0.16),
+                            new THREE.MeshLambertMaterial({color:metall})
+                        );
+                        gel.position.set(axis==="x" ? 0 : side*2.55, hoehe+0.95, axis==="z" ? 0 : side*2.55);
+                        turm.add(gel);
+                    }
+                }
+
+                // Schrägleiter an einer Seite
+                const leiter = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.8, hoehe-0.3, 0.18),
+                    new THREE.MeshLambertMaterial({color:metall})
+                );
+                leiter.position.set(0, hoehe/2, 2.35);
+                turm.add(leiter);
+                for(let r=0;r<8;r++) {
+                    const sprosse = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.9, 0.12, 0.18),
+                        new THREE.MeshLambertMaterial({color:metall})
+                    );
+                    sprosse.position.set(0, 0.7+r*0.85, 2.30);
+                    turm.add(sprosse);
+                }
+
+                // Kleine Überdachung für den Scharfschützen
+                const dach = new THREE.Mesh(
+                    new THREE.BoxGeometry(5.0, 0.22, 4.7),
+                    new THREE.MeshLambertMaterial({color:holz})
+                );
+                dach.position.y = hoehe + 2.9;
+                turm.add(dach);
+
+                turm.position.set(pos[0], 0, pos[1]);
+                turm.traverse(o => {
+                    if(o.isMesh) {
+                        o.castShadow = true;
+                        o.receiveShadow = true;
+                    }
+                });
+                szenerieGruppe.add(turm);
+            });
+        }
+
         function baueSzenerie(missionsNummer) {
             // Beim Wechsel der Mission alte Etagen-Bodeninformationen entfernen.
             hochhausEtagenBoeden = [];
@@ -884,6 +981,9 @@
             );
             floor.rotation.x = -Math.PI / 2;
             szenerieGruppe.add(floor);
+
+            // Wachtürme mit Scharfschützen als zusätzliche taktische Bedrohung.
+            baueWachtuerme(missionsNummer, daten, zufall);
 
             // Ein Hochhaus als zentraler taktischer Punkt in der Ruinenstadt.
             if(daten.objekt === "stadt") {
@@ -1374,6 +1474,48 @@
                     schutzpunkt: null
                 });
             }
+
+            // Fest stationierte Scharfschützen auf den Wachtürmen.
+            const turmPositionen = [
+                [-48, -42],
+                [48, 42]
+            ];
+            if(spieler.mission >= 6) turmPositionen.push([48, -42]);
+            if(spieler.mission >= 9) turmPositionen.push([-48, 42]);
+
+            turmPositionen.forEach((pos, index) => {
+                const mesh = erstelleSoldat();
+                mesh.position.set(pos[0], 7.5, pos[1]);
+                scene.add(mesh);
+                const hp = 135 + spieler.mission * 32;
+                gegnerArray.push({
+                    mesh,
+                    material: mesh.userData.parts.uniformMat,
+                    hp,
+                    maxHp: hp,
+                    flashTimer: 0,
+                    attackCooldown: 0,
+                    animTime: Math.random()*10,
+                    walkPhase: Math.random()*Math.PI*2,
+                    dying: false,
+                    deathTime: 0,
+                    muzzleTime: 0,
+                    shotCooldown: 1.0 + Math.random()*1.5,
+                    verhalten: "scharfschuetze",
+                    spawnPosition: mesh.position.clone(),
+                    strafeDir: 1,
+                    strafeTimer: 999,
+                    lastPlayerShot: 0,
+                    shootAnimTime: 0,
+                    shootRecoil: 0,
+                    entdeckt: false,
+                    entdeckungsZeit: 0,
+                    schutzpunkt: null,
+                    festerPosten: true,
+                    turmIndex: index
+                });
+            }
+
             ausgebenUI();
         }
 
@@ -1861,6 +2003,15 @@
                     }
                 }
 
+                // Scharfschützen auf Wachtürmen bleiben auf ihrem festen Posten.
+                if(g.festerPosten) {
+                    const postZiel = new THREE.Vector3().subVectors(camera.position, g.mesh.position);
+                    postZiel.y = 0;
+                    if(postZiel.lengthSq() > 0.01) {
+                        g.mesh.rotation.y = Math.atan2(postZiel.x, postZiel.z);
+                    }
+                } else {
+
                 // Verhalten 1: Angreifer - verteidigt den Marker und greift den Spieler an
                 // Verhalten 2: Scharfschütze - hält Abstand und schießt aus der Distanz
                 // Verhalten 3: Flanker - versucht seitlich um den Spieler herumzukommen
@@ -1926,8 +2077,8 @@
                 }
 
                 // Waffenhaltung: nah = Anschlag, sonst normale Laufhaltung
-                const schussReichweite = g.verhalten === "scharfschuetze" ? 42 :
-                                         g.verhalten === "verteidiger" ? 30 : 24;
+                const schussReichweite = g.festerPosten ? 58 : (g.verhalten === "scharfschuetze" ? 42 :
+                                         g.verhalten === "verteidiger" ? 30 : 24);
 
                 const soldatAugeFuerSchuss = g.mesh.position.clone();
                 soldatAugeFuerSchuss.y += 1.45;
@@ -1980,8 +2131,8 @@
                         const hitChance = Math.min(0.96, Math.max(0.28, accuracyBase + missionAccuracy - distancePenalty));
 
                         if(Math.random() < hitChance) {
-                            const damage = (g.verhalten === "scharfschuetze" ? 14 :
-                                           g.verhalten === "angreifer" ? 8 : 10) +
+                            const damage = (g.festerPosten ? 19 : (g.verhalten === "scharfschuetze" ? 14 :
+                                           g.verhalten === "angreifer" ? 8 : 10)) +
                                            Math.floor(spieler.mission * 0.8);
                             spieler.hp = Math.max(0, spieler.hp - damage);
                             spieler.lastDamageTime = 0.18;
