@@ -22,6 +22,7 @@
         #fire-btn { position: absolute; bottom: 160px; right: 50px; width: 70px; height: 70px; background: rgba(255, 0, 0, 0.6); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; pointer-events: auto; }
         #tank-scope { display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:170px; height:170px; border:2px solid rgba(255,255,255,.72); border-radius:50%; pointer-events:none; z-index:5; box-shadow:0 0 0 9999px rgba(0,0,0,.06); }
         #hud[data-tank-mode="1"] + #tank-scope { display:block; }
+        #plane-btn { display:none; position:absolute; bottom:315px; left:50%; transform:translateX(-50%); padding:12px 18px; background:rgba(45,85,120,0.95); border:2px solid #8fd3ff; color:white; border-radius:8px; font-weight:bold; font-size:15px; pointer-events:auto; z-index:6; }
         #tank-btn { display:none; position:absolute; bottom:245px; left:50%; transform:translateX(-50%); padding:12px 18px; background:rgba(70,105,55,0.94); border:2px solid #b7d77a; color:white; border-radius:8px; font-weight:bold; font-size:15px; pointer-events:auto; z-index:6; }
         #aim-btn { position: absolute; bottom: 160px; right: 135px; width: 64px; height: 64px; background: rgba(60,60,60,0.78); border: 2px solid rgba(255,255,255,0.65); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; pointer-events: auto; touch-action: none; z-index: 4; }
         #aim-btn.aktiv { background: rgba(40,140,255,0.9); border-color: #8fd3ff; }
@@ -67,6 +68,7 @@
     <div id="aim-btn">ZIELEN</div>
     <div id="fire-btn" class="ui-element">FEUER</div>
     <div id="tank-btn">PANZER EINSTEIGEN</div>
+    <div id="plane-btn">FLUGZEUG EINSTEIGEN</div>
     <div id="tank-scope">ZIELROHR</div>
     <div id="level-btn">LEVEL</div>
     <div id="shop-btn">WAFFEN-SHOP</div>
@@ -400,6 +402,7 @@
         let panzerZerstoerbareObjekte = [];
         let panzerGebietOffen = false;
         let geheimesFlugzeug = null;
+        let flugzeugObjekt=null, flugzeugZielPosition=new THREE.Vector3(-70,0,-75), spielerImFlugzeug=false, flugzeugGeschwindigkeit=0, flugzeugPitch=0;
 
         // Begehbare Gebäude: nur Wände blockieren den Spieler, die Türen bleiben offen.
         let weltKollisionsobjekte = [];
@@ -861,7 +864,7 @@
             {name:"Militärwald", boden:0x315f28, himmel:0x55738a, nebel:0.008, objekt:"wald"},
             {name:"Urwald", boden:0x164d20, himmel:0x3f6870, nebel:0.012, objekt:"urwald"},
             {name:"Wüste", boden:0x9b7a45, himmel:0xc99d68, nebel:0.006, objekt:"wueste"},
-            {name:"Schneegebirge", boden:0xcbd5d8, himmel:0x8fa8bb, nebel:0.010, objekt:"schnee"},
+            {name:"Sicherer Flug", boden:0x9b7a45, himmel:0xc99d68, nebel:0.006, objekt:"wueste"},
             {name:"Sumpf", boden:0x30452b, himmel:0x53685b, nebel:0.014, objekt:"sumpf"},
             {name:"Felsenschlucht", boden:0x5c5148, himmel:0x71818b, nebel:0.008, objekt:"fels"},
             {name:"Küste", boden:0x6b8060, himmel:0x4f88a5, nebel:0.006, objekt:"kueste"},
@@ -1645,6 +1648,96 @@
             ring.userData.label=label;
         }
 
+
+        function baueMission4Flugzeug(){
+            baueMission3PanzerGebiet();
+            const objekte=[...panzerZerstoerbareObjekte];
+            const hangar=objekte.find(o=>o && o.userData.zielTyp==='flugzeugPanzerplatte')?.parent;
+            objekte.forEach(o=>{
+                if(o && o.parent) o.parent.remove(o);
+                const k=weltKollisionsobjekte.indexOf(o);
+                if(k>=0) weltKollisionsobjekte.splice(k,1);
+            });
+            if(hangar && hangar.parent) hangar.parent.remove(hangar);
+            panzerZerstoerbareObjekte=[];
+            if(geheimesFlugzeug){
+                geheimesFlugzeug.visible=true;
+                geheimesFlugzeug.position.set(85,2.8,92);
+                geheimesFlugzeug.rotation.set(0,Math.PI/2,0);
+                flugzeugObjekt=geheimesFlugzeug;
+            }
+            szenerieGruppe.traverse(o=>{ if(o.userData && o.userData.missionMarker) o.visible=false; });
+
+            const runway=new THREE.Mesh(new THREE.PlaneGeometry(18,210),new THREE.MeshLambertMaterial({color:0x25282a}));
+            runway.rotation.x=-Math.PI/2; runway.position.set(85,0.03,-5); runway.receiveShadow=true; szenerieGruppe.add(runway);
+            const lineMat=new THREE.MeshBasicMaterial({color:0xffffff});
+            for(let z=-100;z<=90;z+=12){
+                const line=new THREE.Mesh(new THREE.PlaneGeometry(0.45,6),lineMat);
+                line.rotation.x=-Math.PI/2; line.position.set(85,0.06,z); szenerieGruppe.add(line);
+            }
+            for(const x of [76.2,93.8]){
+                const edge=new THREE.Mesh(new THREE.PlaneGeometry(0.18,210),lineMat);
+                edge.rotation.x=-Math.PI/2; edge.position.set(x,0.055,-5); szenerieGruppe.add(edge);
+            }
+            for(let z=-100;z<=90;z+=15) for(const x of [75.2,94.8]){
+                const light=new THREE.Mesh(new THREE.SphereGeometry(0.16,8,6),new THREE.MeshBasicMaterial({color:0xffd34d}));
+                light.position.set(x,0.18,z); szenerieGruppe.add(light);
+            }
+            const safe=new THREE.Group();
+            const ring=new THREE.Mesh(new THREE.RingGeometry(5.5,6.5,36),new THREE.MeshBasicMaterial({color:0x00ff66,side:THREE.DoubleSide,transparent:true,opacity:0.72}));
+            ring.rotation.x=-Math.PI/2;
+            const beacon=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.18,6,8),new THREE.MeshBasicMaterial({color:0x00ff66}));
+            beacon.position.y=3; safe.add(ring,beacon); safe.position.copy(flugzeugZielPosition); szenerieGruppe.add(safe);
+        }
+
+        function aktualisiereFlugzeugButton(){
+            const btn=document.getElementById('plane-btn');
+            if(!btn || spieler.mission!==4 || !flugzeugObjekt){ if(btn) btn.style.display='none'; return; }
+            const d=camera.position.distanceTo(flugzeugObjekt.position);
+            btn.style.display='block';
+            btn.textContent=spielerImFlugzeug ? 'AUSSTEIGEN' : 'FLUGZEUG EINSTEIGEN';
+            if(!spielerImFlugzeug && d>=7) btn.style.display='none';
+        }
+
+        function toggleFlugzeugEinsteigen(){
+            if(spieler.mission!==4 || !flugzeugObjekt) return;
+            if(spielerImFlugzeug){
+                if(flugzeugGeschwindigkeit>4 || flugzeugObjekt.position.y>4.5) return;
+                spielerImFlugzeug=false;
+                camera.position.set(flugzeugObjekt.position.x+4,2,flugzeugObjekt.position.z);
+                rotationX=0; rotationY=flugzeugObjekt.rotation.y; return;
+            }
+            if(camera.position.distanceTo(flugzeugObjekt.position)>7) return;
+            spielerImFlugzeug=true; rotationX=0; rotationY=flugzeugObjekt.rotation.y;
+        }
+
+        function aktualisiereFlugzeug(delta){
+            if(spieler.mission!==4 || !flugzeugObjekt || !spielerImFlugzeug) return;
+            const gas=Math.max(0,moveInput.y), bremsen=Math.max(0,-moveInput.y);
+            if(flugzeugObjekt.position.y<=3.0){
+                flugzeugGeschwindigkeit+=gas*24*delta;
+                flugzeugGeschwindigkeit-=bremsen*30*delta+3*delta;
+                flugzeugGeschwindigkeit=Math.max(0,Math.min(42,flugzeugGeschwindigkeit));
+                flugzeugObjekt.rotation.y-=moveInput.x*0.75*delta*(0.4+flugzeugGeschwindigkeit/20);
+                flugzeugPitch=0;
+                if(flugzeugGeschwindigkeit>14 && lookInput.y>0.12){ flugzeugObjekt.position.y=3.05; flugzeugPitch=0.08; }
+            }else{
+                flugzeugGeschwindigkeit=Math.max(7,Math.min(50,flugzeugGeschwindigkeit-bremsen*10*delta-0.7*delta));
+                flugzeugPitch=Math.max(-0.28,Math.min(0.42,flugzeugPitch+lookInput.y*0.72*delta));
+                flugzeugObjekt.rotation.y-=lookInput.x*0.75*delta;
+            }
+            const q=new THREE.Quaternion().setFromEuler(new THREE.Euler(flugzeugPitch,flugzeugObjekt.rotation.y,0,'YXZ'));
+            const vorwaerts=new THREE.Vector3(1,0,0).applyQuaternion(q);
+            if(flugzeugObjekt.position.y>3) vorwaerts.y-=0.20;
+            flugzeugObjekt.position.addScaledVector(vorwaerts,flugzeugGeschwindigkeit*delta);
+            if(flugzeugObjekt.position.y<=3){ flugzeugObjekt.position.y=2.8; flugzeugPitch=0; }
+            flugzeugObjekt.position.x=Math.max(-118,Math.min(118,flugzeugObjekt.position.x));
+            flugzeugObjekt.position.z=Math.max(-118,Math.min(118,flugzeugObjekt.position.z));
+            const camOffset=new THREE.Vector3(-10,3.8,-0.4).applyQuaternion(q);
+            camera.position.copy(flugzeugObjekt.position).add(camOffset);
+            camera.lookAt(flugzeugObjekt.position.clone().addScaledVector(vorwaerts,28));
+        }
+
         function aktualisierePanzerButton(){
             const hud=document.getElementById('hud');
             if(hud) hud.dataset.tankMode=spielerImPanzer ? '1' : '0';
@@ -1783,7 +1876,7 @@
             scene.fog = new THREE.FogExp2(daten.himmel, daten.nebel);
 
             // Taktische Wachtürme auf jeder Mission.
-            baueWachtuerme(missionsNummer);
+            if(missionsNummer!==4) baueWachtuerme(missionsNummer);
 
             const floor = new THREE.Mesh(
                 new THREE.PlaneGeometry(260, 260),
@@ -1817,6 +1910,7 @@
             }
 
             if(missionsNummer===1 || missionsNummer===2 || missionsNummer===3) bauePanzerMission();
+            if(missionsNummer===4) baueMission4Flugzeug();
             if(missionsNummer===3) baueMission3PanzerGebiet();
             if(daten.objekt === "geisel") baueGeiselSzenerie();
             if(daten.objekt === "verbuendete") baueVerbuendetenSzenerie();
@@ -2603,6 +2697,8 @@
                 aktuellesZiel={typ:"panzer_fahrt",name:"Bringe den Panzer sicher nach draußen in unser Versteck"};
             } else if(spieler.mission===3) {
                 aktuellesZiel={typ:"flugzeug",name:"Dringe in das Gebiet ein und zerstöre den Hangar"};
+            } else if(spieler.mission===4) {
+                aktuellesZiel={typ:"flugzeug_fahrt",name:"Bringe das Flugzeug in das sichere Versteck"};
             } else if(spieler.mission===11) {
                 aktuellesZiel={typ:"geisel",name:"Rette die Geisel – kein Alarm!"};
             } else if(spieler.mission===12) {
@@ -2690,6 +2786,11 @@
                 if(camera.position.distanceTo(geheimesFlugzeug.position)<8 && !missionAbgeschlossen) missionErfolgreich();
             }
 
+            if(aktuellesZiel.typ === "flugzeug_fahrt" && flugzeugObjekt && !missionAbgeschlossen) {
+                const d=flugzeugObjekt.position.distanceTo(flugzeugZielPosition);
+                if(d<9 && flugzeugObjekt.position.y<7 && flugzeugGeschwindigkeit<12) missionErfolgreich();
+            }
+
             if(aktuellesZiel.typ === "panzer_fahrt" && panzerObjekt) {
                 const d=panzerObjekt.position.distanceTo(panzerZielPosition);
                 if(d<7.5 && !missionAbgeschlossen) {
@@ -2702,6 +2803,7 @@
         function starteMission() {
             if(geiselObjekt){scene.remove(geiselObjekt);geiselObjekt=null;}
             if(panzerObjekt){scene.remove(panzerObjekt);panzerObjekt=null;}
+            flugzeugObjekt=null; spielerImFlugzeug=false; flugzeugGeschwindigkeit=0; flugzeugPitch=0;
             spielerImPanzer=false;
             panzerFahrbar=false;
             panzerTurm=null;
@@ -2721,11 +2823,12 @@
                 camera.position.set(panzerPosition.x-6,2,panzerPosition.z+3);
                 rotationY=Math.atan2(panzerPosition.x-camera.position.x,panzerPosition.z-camera.position.z);
             }
+            if(spieler.mission===4 && flugzeugObjekt){ camera.position.set(flugzeugObjekt.position.x-7,2.5,flugzeugObjekt.position.z); rotationY=flugzeugObjekt.rotation.y; }
             if(zielZone) {
                 scene.remove(zielZone);
                 zielZone = null;
             }
-            const gegnerAnzahl=(spieler.mission===11 || spieler.mission===2 || spieler.mission===3) ? 0 : Math.min(18,3+spieler.mission+Math.floor(spieler.mission/3));
+            const gegnerAnzahl=(spieler.mission===4 || spieler.mission===11 || spieler.mission===2 || spieler.mission===3) ? 0 : Math.min(18,3+spieler.mission+Math.floor(spieler.mission/3));
             erstelleGegner(gegnerAnzahl);
             if(spieler.mission===11){
                 [[24,-40],[32,-40],[40,-40],[21,-30],[43,-30],[24,-20],[32,-20],[40,-20],[27,-25],[37,-25]]
@@ -2810,6 +2913,7 @@
             if(spieler.mission===12) starteVerbuendete();
 
             // Stationäre Scharfschützen auf den Wachtürmen.
+            if(spieler.mission!==4){
             const turmPositionen = spieler.mission <= 5
                 ? [[-48,-42],[48,42]]
                 : spieler.mission <= 8
@@ -2852,6 +2956,7 @@
                     geiselSichtSchwelle:0.40
                 });
             });
+            }
 
             neuesMissionsziel();
         }
@@ -2907,6 +3012,7 @@
             if(!sichtbar) renderShop();
         }
         document.getElementById('shop-btn').addEventListener('click', toggleShop);
+        document.getElementById('plane-btn').addEventListener('pointerdown', (e)=>{ e.preventDefault(); e.stopPropagation(); toggleFlugzeugEinsteigen(); });
         document.getElementById('tank-btn').addEventListener('pointerdown', (e)=>{
             e.preventDefault();
             e.stopPropagation();
@@ -2969,11 +3075,13 @@
             }
 
             aktualisierePanzer(delta);
+            aktualisiereFlugzeug(delta);
             aktualisierePanzerButton();
+            aktualisiereFlugzeugButton();
 
             const vorherX = camera.position.x;
             const vorherZ = camera.position.z;
-            if(!spielerImPanzer){
+            if(!spielerImPanzer && !spielerImFlugzeug){
                 velocity.set(moveInput.x, 0, -moveInput.y);
                 if(velocity.lengthSq()>0.0001){
                     velocity.normalize();
