@@ -1739,6 +1739,19 @@
             if(!spielerImFlugzeug && d>=7) btn.style.display='none';
         }
 
+        const planeBtnElement=document.getElementById('plane-btn');
+        if(planeBtnElement){
+            planeBtnElement.addEventListener('pointerdown',(e)=>{
+                e.preventDefault();
+                e.stopPropagation();
+                toggleFlugzeugEinsteigen();
+            });
+            planeBtnElement.addEventListener('touchstart',(e)=>{
+                e.preventDefault();
+                e.stopPropagation();
+            },{passive:false});
+        }
+
         function toggleFlugzeugEinsteigen(){
             if(spieler.mission!==4 || !flugzeugObjekt) return;
             if(spielerImFlugzeug){
