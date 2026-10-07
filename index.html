@@ -20,6 +20,7 @@
         #look-stick { right: 40px; width: 100px; height: 100px; }
         #jump-btn { position: absolute; bottom: 245px; right: 55px; width: 64px; height: 64px; background: rgba(40,150,255,0.65); border-radius: 50%; display:flex; align-items:center; justify-content:center; font-size:14px; pointer-events:auto; z-index:4; }
         #fire-btn { position: absolute; bottom: 160px; right: 50px; width: 70px; height: 70px; background: rgba(255, 0, 0, 0.6); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; pointer-events: auto; }
+        #tank-btn { display:none; position:absolute; bottom:245px; left:50%; transform:translateX(-50%); padding:12px 18px; background:rgba(70,105,55,0.94); border:2px solid #b7d77a; color:white; border-radius:8px; font-weight:bold; font-size:15px; pointer-events:auto; z-index:6; }
         #aim-btn { position: absolute; bottom: 160px; right: 135px; width: 64px; height: 64px; background: rgba(60,60,60,0.78); border: 2px solid rgba(255,255,255,0.65); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; pointer-events: auto; touch-action: none; z-index: 4; }
         #aim-btn.aktiv { background: rgba(40,140,255,0.9); border-color: #8fd3ff; }
         #shop-btn { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); padding: 12px 24px; background: #FFD700; color: black; border-radius: 5px; pointer-events: auto; font-size: 16px; }
@@ -63,6 +64,7 @@
     <div id="jump-btn" class="ui-element">SPRUNG</div>
     <div id="aim-btn">ZIELEN</div>
     <div id="fire-btn" class="ui-element">FEUER</div>
+    <div id="tank-btn">PANZER EINSTEIGEN</div>
     <div id="level-btn">LEVEL</div>
     <div id="shop-btn">WAFFEN-SHOP</div>
 
@@ -386,6 +388,12 @@
         // Panzer-Missionsdaten müssen vor dem ersten baueSzenerie(1)-Aufruf existieren.
         let panzerObjekt = null;
         let panzerPosition = new THREE.Vector3(55,0,-52);
+        let panzerFahrbar = false;
+        let spielerImPanzer = false;
+        let panzerZielPosition = new THREE.Vector3(85,0,-85);
+        let panzerTurm = null;
+        let panzerLauf = null;
+        let panzerFeuerCooldown = 0;
 
         // Begehbare Gebäude: nur Wände blockieren den Spieler, die Türen bleiben offen.
         let weltKollisionsobjekte = [];
@@ -1298,6 +1306,17 @@
 
         function bauePanzerMission(){
             if(panzerObjekt){ scene.remove(panzerObjekt); panzerObjekt=null; }
+            panzerFahrbar = spieler.mission === 2;
+            spielerImPanzer = false;
+            panzerTurm = null;
+            panzerLauf = null;
+            panzerFeuerCooldown = 0;
+            if(spieler.mission === 2) {
+                panzerPosition.set(15,0,-25);
+                panzerZielPosition.set(82,0,-82);
+            } else {
+                panzerPosition.set(55,0,-52);
+            }
 
             const tank=new THREE.Group();
             const hullMat=new THREE.MeshLambertMaterial({color:0x3b4630});
@@ -1323,9 +1342,11 @@
 
             const barrel=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.28,5.2,10),metalMat);
             barrel.rotation.x=Math.PI/2;
-            barrel.position.set(0,2.72,-2.55);
+            barrel.position.set(0,0,-2.55);
             barrel.castShadow=true;
-            tank.add(barrel);
+            turret.add(barrel);
+            panzerTurm=turret;
+            panzerLauf=barrel;
 
             [-2.15,2.15].forEach(x=>{
                 [-2.45,0,2.45].forEach(z=>{
@@ -1347,6 +1368,9 @@
 
             tank.position.copy(panzerPosition);
             tank.rotation.y=Math.PI*0.12;
+            tank.userData.hp=500;
+            tank.userData.maxHp=500;
+            tank.userData.hitFlash=0;
             szenerieGruppe.add(tank);
             panzerObjekt=tank;
 
@@ -1375,6 +1399,100 @@
             const light=new THREE.PointLight(0xff5533,1.6,18);
             light.position.set(panzerPosition.x,4.5,panzerPosition.z);
             szenerieGruppe.add(light);
+
+            if(spieler.mission===2) {
+                const ziel=new THREE.Mesh(
+                    new THREE.RingGeometry(5,6,32),
+                    new THREE.MeshBasicMaterial({color:0x00ff66,side:THREE.DoubleSide,transparent:true,opacity:0.75})
+                );
+                ziel.rotation.x=-Math.PI/2;
+                ziel.position.copy(panzerZielPosition);
+                ziel.position.y=0.06;
+                szenerieGruppe.add(ziel);
+                const beacon=new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.18,0.18,7,8),
+                    new THREE.MeshBasicMaterial({color:0x00ff66})
+                );
+                beacon.position.copy(panzerZielPosition);
+                beacon.position.y=3.5;
+                szenerieGruppe.add(beacon);
+            }
+        }
+
+        function aktualisierePanzerButton(){
+            const btn=document.getElementById('tank-btn');
+            if(!btn) return;
+            if(spieler.mission!==2 || !panzerObjekt){
+                btn.style.display='none';
+                return;
+            }
+            const d=camera.position.distanceTo(panzerObjekt.position);
+            if(spielerImPanzer){
+                btn.style.display='block';
+                btn.textContent='AUSSTEIGEN';
+            } else if(d<6.5){
+                btn.style.display='block';
+                btn.textContent='PANZER EINSTEIGEN';
+            } else {
+                btn.style.display='none';
+            }
+        }
+
+        function togglePanzerEinsteigen(){
+            if(spieler.mission!==2 || !panzerObjekt) return;
+            if(spielerImPanzer){
+                spielerImPanzer=false;
+                camera.position.set(
+                    panzerObjekt.position.x + Math.sin(panzerObjekt.rotation.y)*4,
+                    2,
+                    panzerObjekt.position.z + Math.cos(panzerObjekt.rotation.y)*4
+                );
+                rotationX=0;
+                rotationY=panzerObjekt.rotation.y;
+                return;
+            }
+            if(camera.position.distanceTo(panzerObjekt.position)>6.5) return;
+            spielerImPanzer=true;
+            rotationX=-0.04;
+            rotationY=panzerObjekt.rotation.y;
+        }
+
+        function aktualisierePanzer(delta){
+            if(!panzerObjekt || spieler.mission!==2) return;
+
+            if(spielerImPanzer){
+                const steuerung=moveInput.y;
+                const len=Math.abs(steuerung);
+                if(len>0.05){
+                    panzerObjekt.rotation.y -= moveInput.x * delta * 0.95;
+                    const vorwaerts=new THREE.Vector3(
+                        Math.sin(panzerObjekt.rotation.y),
+                        0,
+                        Math.cos(panzerObjekt.rotation.y)
+                    ).multiplyScalar(-steuerung * delta * 7.0);
+                    panzerObjekt.position.add(vorwaerts);
+                    panzerObjekt.position.x=Math.max(-118,Math.min(118,panzerObjekt.position.x));
+                    panzerObjekt.position.z=Math.max(-118,Math.min(118,panzerObjekt.position.z));
+                }
+
+                rotationY=panzerObjekt.rotation.y + lookInput.x*0.02;
+                if(panzerTurm) panzerTurm.rotation.y = lookInput.x*0.02;
+                if(panzerLauf) panzerLauf.rotation.x=Math.PI/2;
+
+                const sitzOffset=new THREE.Vector3(0,3.35,1.0);
+                sitzOffset.applyAxisAngle(new THREE.Vector3(0,1,0),panzerObjekt.rotation.y);
+                camera.position.copy(panzerObjekt.position).add(sitzOffset);
+                camera.position.y=3.35;
+            }
+
+            if(panzerObjekt.userData.hitFlash>0){
+                panzerObjekt.userData.hitFlash-=delta;
+                if(panzerObjekt.userData.hitFlash<=0) panzerObjekt.traverse(o=>{if(o.isMesh) o.material.emissive && o.material.emissive.setHex(0x000000);});
+            }
+            panzerFeuerCooldown=Math.max(0,panzerFeuerCooldown-delta);
+            if(spielerImPanzer && panzerTurm){
+                panzerTurm.rotation.y = rotationY-panzerObjekt.rotation.y;
+            }
         }
 
         function baueSzenerie(missionsNummer) {
@@ -1440,7 +1558,7 @@
                 }
             }
 
-            if(missionsNummer===1) bauePanzerMission();
+            if(missionsNummer===1 || missionsNummer===2) bauePanzerMission();
             if(daten.objekt === "geisel") baueGeiselSzenerie();
             if(daten.objekt === "verbuendete") baueVerbuendetenSzenerie();
 
@@ -1994,6 +2112,32 @@
         }, {passive:false});
 
         function feuerWaffe() {
+            if(spielerImPanzer){
+                if(panzerFeuerCooldown>0 || !panzerObjekt) return;
+                panzerFeuerCooldown=0.85;
+                playShootSound();
+
+                const raycaster=new THREE.Raycaster();
+                raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
+                const intersects=raycaster.intersectObjects(gegnerArray.map(g=>g.mesh),true);
+                if(intersects.length>0){
+                    const getroffenMesh=intersects[0].object;
+                    const gegner=gegnerArray.find(g=>g.mesh===getroffenMesh || g.mesh.getObjectById(getroffenMesh.id));
+                    if(gegner){
+                        playHitSound();
+                        gegner.hp-=95;
+                        gegner.mesh.userData.parts.uniformMat.color.setHex(0xffffff);
+                        gegner.flashTimer=0.1;
+                        if(gegner.hp<=0 && !gegner.dying){
+                            gegner.dying=true;
+                            gegner.deathTime=0;
+                            gegner.mesh.userData.deathAwarded=false;
+                        }
+                    }
+                }
+                ausgebenUI();
+                return;
+            }
             playShootSound();
             // Kein Kamera-Hochziehen beim Schießen.
             // Der Rückstoß bleibt nur in der Schussanimation/Optik sichtbar.
@@ -2032,6 +2176,8 @@
 
             if(spieler.mission===1) {
                 aktuellesZiel={typ:"panzer",name:"Suche den Panzer – stark bewacht!"};
+            } else if(spieler.mission===2) {
+                aktuellesZiel={typ:"panzer_fahrt",name:"Bringe den Panzer sicher nach draußen in unser Versteck"};
             } else if(spieler.mission===11) {
                 aktuellesZiel={typ:"geisel",name:"Rette die Geisel – kein Alarm!"};
             } else if(spieler.mission===12) {
@@ -2115,11 +2261,22 @@
                 const d=camera.position.distanceTo(panzerPosition);
                 if(d<7.5) missionErfolgreich();
             }
+            if(aktuellesZiel.typ === "panzer_fahrt" && panzerObjekt) {
+                const d=panzerObjekt.position.distanceTo(panzerZielPosition);
+                if(d<7.5 && !missionAbgeschlossen) {
+                    spielerImPanzer=false;
+                    missionErfolgreich();
+                }
+            }
         }
 
         function starteMission() {
             if(geiselObjekt){scene.remove(geiselObjekt);geiselObjekt=null;}
             if(panzerObjekt){scene.remove(panzerObjekt);panzerObjekt=null;}
+            spielerImPanzer=false;
+            panzerFahrbar=false;
+            panzerTurm=null;
+            panzerLauf=null;
             if(geiselZone){scene.remove(geiselZone);geiselZone=null;}
             verbuendeteArray.forEach(a=>scene.remove(a.mesh));
             verbuendeteArray=[];
@@ -2135,24 +2292,29 @@
                 scene.remove(zielZone);
                 zielZone = null;
             }
-            const gegnerAnzahl=spieler.mission===11 ? 0 : Math.min(18,3+spieler.mission+Math.floor(spieler.mission/3));
+            const gegnerAnzahl=(spieler.mission===11 || spieler.mission===2) ? 0 : Math.min(18,3+spieler.mission+Math.floor(spieler.mission/3));
             erstelleGegner(gegnerAnzahl);
             if(spieler.mission===11){
                 [[24,-40],[32,-40],[40,-40],[21,-30],[43,-30],[24,-20],[32,-20],[40,-20],[27,-25],[37,-25]]
                 .forEach((p,i)=>fuegeGeiselWacheHinzu(p[0],p[1],i));
             }
-            if(spieler.mission===1){
+            if(spieler.mission===1 || spieler.mission===2){
                 // Der Panzer wird von einem großen Sicherungsring aus Bodentruppen bewacht.
                 const wachen=[
                     [-10,-4],[-7,-8],[0,-10],[7,-8],[10,-4],
                     [-11,4],[-7,9],[0,11],[7,9],[11,4],
                     [-4,-13],[4,-13]
                 ];
-                wachen.forEach((p,i)=>{
+                const mission2Wachen = [
+                    [-10,-6],[-6,-10],[0,-12],[7,-9],[11,-4],
+                    [-11,4],[-8,9],[0,11],[8,8],[12,3]
+                ];
+                const aktiveWachen = spieler.mission===2 ? mission2Wachen : wachen;
+                aktiveWachen.forEach((p,i)=>{
                     const mesh=erstelleSoldat();
                     mesh.position.set(panzerPosition.x+p[0],0,panzerPosition.z+p[1]);
                     scene.add(mesh);
-                    const verhalten=(i%5===0) ? "scharfschuetze" : "verteidiger";
+                    const verhalten=(i%4===0) ? "scharfschuetze" : "verteidiger";
                     const hp=135+spieler.mission*32;
                     gegnerArray.push({
                         mesh,
@@ -2237,6 +2399,7 @@
             document.getElementById('weapon-val').innerText = aktuelleWaffe.name;
             document.getElementById('cover-status').innerText = spielerIstInGebaeude() ? '🛡️ IN DECKUNG' : '';
             document.getElementById('mission-num').innerText = spieler.mission;
+            aktualisierePanzerButton();
             if(aktuellesZiel) {
                 if(aktuellesZiel.typ === "ueberleben") {
                     const rest = Math.max(0, Math.ceil(zielZeit));
@@ -2281,6 +2444,11 @@
             if(!sichtbar) renderShop();
         }
         document.getElementById('shop-btn').addEventListener('click', toggleShop);
+        document.getElementById('tank-btn').addEventListener('pointerdown', (e)=>{
+            e.preventDefault();
+            e.stopPropagation();
+            togglePanzerEinsteigen();
+        });
 
         function renderShop() {
             const list = document.getElementById('shop-list');
@@ -2335,27 +2503,35 @@
             rotationX = Math.max(-Math.PI/3, Math.min(Math.PI/3, rotationX));
             camera.quaternion.setFromEuler(new THREE.Euler(rotationX, rotationY, 0, 'YXZ'));
 
+            aktualisierePanzer(delta);
+            aktualisierePanzerButton();
+
             const vorherX = camera.position.x;
             const vorherZ = camera.position.z;
-            velocity.set(moveInput.x, 0, -moveInput.y).normalize();
-            velocity.applyQuaternion(camera.quaternion);
-            velocity.y = 0;
-            camera.position.addScaledVector(velocity, delta * 12);
+            if(!spielerImPanzer){
+                velocity.set(moveInput.x, 0, -moveInput.y);
+                if(velocity.lengthSq()>0.0001){
+                    velocity.normalize();
+                    velocity.applyQuaternion(camera.quaternion);
+                    velocity.y = 0;
+                    camera.position.addScaledVector(velocity, delta * 12);
+                }
+            }
 
             // Türen öffnen/schließen automatisch, wenn der Spieler sich nähert.
             aktualisiereTueren();
 
             // Gebäude haben echte Wände und Türen. Durch Wände kann man nicht laufen.
-            korrigiereGebaeudeKollision(vorherX, vorherZ);
+            if(!spielerImPanzer) korrigiereGebaeudeKollision(vorherX, vorherZ);
 
             // Unsichtbare Grenzen der Spielwelt: der Spieler kann die Szenerie nicht verlassen.
             const weltGrenze = 126;
             camera.position.x = Math.max(-weltGrenze, Math.min(weltGrenze, camera.position.x));
             camera.position.z = Math.max(-weltGrenze, Math.min(weltGrenze, camera.position.z));
-            aktualisiereEtagenMarker();
+            if(!spielerImPanzer) aktualisiereEtagenMarker();
             // Die sichtbaren Treppen bleiben im Hochhaus, aber die Etagen werden
             // jetzt sicher über die markierten Teleportflächen gewechselt.
-            const aufTreppe = false;
+            const aufTreppe = spielerImPanzer;
             if(!aufTreppe) {
                 // Böden der Hochhaus-Etagen tragen den Spieler, damit er auf
                 // jedem Stockwerk stehen und springen kann, ohne durchzufallen.
@@ -2386,6 +2562,11 @@
                         istInDerLuft = false;
                     }
                 }
+            }
+
+            if(spielerImPanzer && panzerObjekt){
+                // Die Kamera bleibt im Panzer und der Panzer nimmt keinen normalen Fallschaden.
+                camera.position.y=3.35;
             }
 
             if(aktuellesZiel && aktuellesZiel.typ === "ueberleben" && !missionAbgeschlossen) {
@@ -2678,12 +2859,25 @@
                             const damage = (g.verhalten === "scharfschuetze" ? 14 :
                                            g.verhalten === "angreifer" ? 8 : 10) +
                                            Math.floor(spieler.mission * 0.8);
-                            spieler.hp = Math.max(0, spieler.hp - damage);
-                            spieler.lastDamageTime = 0.18;
-                            playPlayerHitSound();
-                            ausgebenUI();
+                            if(spielerImPanzer && panzerObjekt){
+                                panzerObjekt.userData.hp = Math.max(0, (panzerObjekt.userData.hp ?? 500) - damage*1.8);
+                                panzerObjekt.userData.hitFlash = 0.12;
+                                ausgebenUI();
+                                if(panzerObjekt.userData.hp <= 0){
+                                    spielerImPanzer=false;
+                                    alert("Der Panzer wurde zerstört! Die Mission startet neu.");
+                                    panzerObjekt.userData.hp=500;
+                                    spieler.hp=100;
+                                    starteMission();
+                                    ausgebenUI();
+                                }
+                            } else {
+                                spieler.hp = Math.max(0, spieler.hp - damage);
+                                spieler.lastDamageTime = 0.18;
+                                playPlayerHitSound();
+                                ausgebenUI();
 
-                            if(spieler.hp <= 0) {
+                                if(spieler.hp <= 0) {
                                 spieler.hp = 0;
                                 ausgebenUI();
                                 setTimeout(() => {
@@ -2694,6 +2888,7 @@
                                         ausgebenUI();
                                     }
                                 }, 250);
+                                }
                             }
                         }
                     }
