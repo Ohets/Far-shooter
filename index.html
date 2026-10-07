@@ -1479,25 +1479,31 @@
                     panzerObjekt.position.z=Math.max(-118,Math.min(118,panzerObjekt.position.z));
                 }
 
-                // Das Zielfernrohr kann unabhängig vom Panzer mit dem rechten Joystick
-                // nach links/rechts und oben/unten verstellt werden.
-                rotationY=panzerObjekt.rotation.y + lookInput.x*0.025;
-                rotationX=Math.max(-0.42,Math.min(0.28,rotationX + lookInput.y*0.012));
-                if(panzerTurm) panzerTurm.rotation.y = rotationY-panzerObjekt.rotation.y;
-                if(panzerLauf) {
-                    panzerLauf.rotation.x=Math.PI/2 + rotationX*0.65;
-                }
+                // Panzer-Zielsteuerung: rechter Joystick und Wischgeste
+                // verändern jetzt gemeinsam Turmrichtung und Zielfernrohr.
+                rotationY -= lookInput.x * delta * 1.8;
+                rotationX += lookInput.y * delta * 1.25;
+                rotationX=Math.max(-0.55,Math.min(0.35,rotationX));
 
-                // Außensicht: Kamera sitzt hinter/über dem Panzer und folgt ihm.
+                if(panzerTurm) panzerTurm.rotation.y = rotationY-panzerObjekt.rotation.y;
+                if(panzerLauf) panzerLauf.rotation.x=Math.PI/2 + rotationX*0.65;
+
+                // Außensicht: Kamera bleibt hinter/über dem Panzer, schaut aber
+                // in die Richtung des verstellten Zielfernrohrs.
                 const sitzOffset=new THREE.Vector3(0,4.4,7.2);
                 sitzOffset.applyAxisAngle(new THREE.Vector3(0,1,0),panzerObjekt.rotation.y);
                 camera.position.copy(panzerObjekt.position).add(sitzOffset);
                 camera.position.y=4.4;
-                camera.lookAt(
-                    panzerObjekt.position.x,
-                    panzerObjekt.position.y+1.5,
-                    panzerObjekt.position.z
+
+                const zielRichtung=new THREE.Vector3(
+                    Math.sin(rotationY)*Math.cos(rotationX),
+                    Math.sin(rotationX),
+                    Math.cos(rotationY)*Math.cos(rotationX)
                 );
+                const sichtZiel=panzerObjekt.position.clone()
+                    .addScaledVector(zielRichtung,30);
+                sichtZiel.y+=1.5;
+                camera.lookAt(sichtZiel);
             }
 
             if(panzerObjekt.userData.hitFlash>0){
@@ -2051,10 +2057,50 @@
         let lookInput = { x: 0, y: 0 };
         let moveTouchId = null;
         let lookTouchId = null;
+        let panzerSwipeId = null;
+        let panzerSwipeX = 0;
+        let panzerSwipeY = 0;
 
         const moveStick = document.getElementById('move-stick');
         const lookStick = document.getElementById('look-stick');
         const fireBtn = document.getElementById('fire-btn');
+        const canvasContainer = document.getElementById('canvas-container');
+
+        // Im Panzer kann die Sicht direkt durch Wischen über den Bildschirm
+        // verändert werden. Der Wisch-Finger wird getrennt von den Joysticks behandelt.
+        canvasContainer.addEventListener('touchstart', (e) => {
+            if(!spielerImPanzer || panzerSwipeId !== null) return;
+            if(e.target.closest && e.target.closest('#move-stick, #look-stick, #fire-btn, #aim-btn, #tank-btn, #jump-btn, #shop-btn, #level-btn')) return;
+            if(e.changedTouches.length){
+                const t=e.changedTouches[0];
+                panzerSwipeId=t.identifier;
+                panzerSwipeX=t.clientX;
+                panzerSwipeY=t.clientY;
+            }
+        }, {passive:true});
+
+        canvasContainer.addEventListener('touchmove', (e) => {
+            if(!spielerImPanzer || panzerSwipeId === null) return;
+            const t=Array.from(e.touches).find(x=>x.identifier===panzerSwipeId);
+            if(!t) return;
+            const dx=t.clientX-panzerSwipeX;
+            const dy=t.clientY-panzerSwipeY;
+            panzerSwipeX=t.clientX;
+            panzerSwipeY=t.clientY;
+            rotationY -= dx * 0.008;
+            rotationX += dy * 0.006;
+            rotationX=Math.max(-0.55,Math.min(0.35,rotationX));
+            e.preventDefault();
+        }, {passive:false});
+
+        function beendePanzerSwipe(e){
+            if(panzerSwipeId===null) return;
+            if(Array.from(e.changedTouches).some(t=>t.identifier===panzerSwipeId)){
+                panzerSwipeId=null;
+            }
+        }
+        canvasContainer.addEventListener('touchend', beendePanzerSwipe, {passive:true});
+        canvasContainer.addEventListener('touchcancel', beendePanzerSwipe, {passive:true});
 
         // Jede Joystick-Seite merkt sich ihren eigenen Finger.
         // Dadurch kann der Feuer-Finger niemals versehentlich den Blick nach oben/unten steuern.
@@ -2548,10 +2594,12 @@
                 document.getElementById('hud').style.transform = 'translateX(0)';
             }
 
-            rotationY -= lookInput.x * 0.03;
-            rotationX += lookInput.y * 0.03;
-            rotationX = Math.max(-Math.PI/3, Math.min(Math.PI/3, rotationX));
-            camera.quaternion.setFromEuler(new THREE.Euler(rotationX, rotationY, 0, 'YXZ'));
+            if(!spielerImPanzer){
+                rotationY -= lookInput.x * 0.03;
+                rotationX += lookInput.y * 0.03;
+                rotationX = Math.max(-Math.PI/3, Math.min(Math.PI/3, rotationX));
+                camera.quaternion.setFromEuler(new THREE.Euler(rotationX, rotationY, 0, 'YXZ'));
+            }
 
             aktualisierePanzer(delta);
             aktualisierePanzerButton();
