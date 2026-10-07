@@ -22,6 +22,10 @@
         #fire-btn { position: absolute; bottom: 160px; right: 50px; width: 70px; height: 70px; background: rgba(255, 0, 0, 0.6); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; pointer-events: auto; }
         #tank-scope { display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:170px; height:170px; border:2px solid rgba(255,255,255,.72); border-radius:50%; pointer-events:none; z-index:5; box-shadow:0 0 0 9999px rgba(0,0,0,.06); }
         #hud[data-tank-mode="1"] + #tank-scope { display:block; }
+        #plane-throttle { display:none; position:absolute; left:155px; bottom:42px; width:34px; height:120px; border-radius:17px; background:rgba(20,25,30,0.72); border:2px solid rgba(180,220,255,0.75); pointer-events:auto; touch-action:none; z-index:7; }
+        #plane-throttle .fill { position:absolute; left:7px; right:7px; bottom:7px; height:20%; border-radius:10px; background:rgba(80,190,255,0.85); pointer-events:none; }
+        #plane-throttle .knob { position:absolute; left:2px; width:26px; height:26px; bottom:14%; transform:translateY(50%); border-radius:50%; background:#fff; border:2px solid #69c8ff; box-sizing:border-box; pointer-events:none; }
+        #plane-throttle-label { display:none; position:absolute; left:145px; bottom:168px; color:white; font-weight:bold; font-size:11px; text-shadow:1px 1px 2px #000; z-index:7; pointer-events:none; }
         #plane-btn { display:none; position:absolute; bottom:315px; left:50%; transform:translateX(-50%); padding:12px 18px; background:rgba(45,85,120,0.95); border:2px solid #8fd3ff; color:white; border-radius:8px; font-weight:bold; font-size:15px; pointer-events:auto; z-index:6; }
         #tank-btn { display:none; position:absolute; bottom:245px; left:50%; transform:translateX(-50%); padding:12px 18px; background:rgba(70,105,55,0.94); border:2px solid #b7d77a; color:white; border-radius:8px; font-weight:bold; font-size:15px; pointer-events:auto; z-index:6; }
         #aim-btn { position: absolute; bottom: 160px; right: 135px; width: 64px; height: 64px; background: rgba(60,60,60,0.78); border: 2px solid rgba(255,255,255,0.65); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; pointer-events: auto; touch-action: none; z-index: 4; }
@@ -64,6 +68,8 @@
 
     <div id="move-stick" class="joystick"></div>
     <div id="look-stick" class="joystick"></div>
+    <div id="plane-throttle"><div class="fill"></div><div class="knob"></div></div>
+    <div id="plane-throttle-label">SCHUB</div>
     <div id="jump-btn" class="ui-element">SPRUNG</div>
     <div id="aim-btn">ZIELEN</div>
     <div id="fire-btn" class="ui-element">FEUER</div>
@@ -403,6 +409,7 @@
         let panzerGebietOffen = false;
         let geheimesFlugzeug = null;
         let flugzeugObjekt=null, flugzeugZielPosition=new THREE.Vector3(-70,0,-75), spielerImFlugzeug=false, flugzeugGeschwindigkeit=0, flugzeugPitch=0;
+        let planeThrottleInput=0.18;
 
         // Begehbare Gebäude: nur Wände blockieren den Spieler, die Türen bleiben offen.
         let weltKollisionsobjekte = [];
@@ -1724,6 +1731,11 @@
             const d=camera.position.distanceTo(flugzeugObjekt.position);
             btn.style.display='block';
             btn.textContent=spielerImFlugzeug ? 'AUSSTEIGEN' : 'FLUGZEUG EINSTEIGEN';
+            const throttle=document.getElementById('plane-throttle');
+            const throttleLabel=document.getElementById('plane-throttle-label');
+            if(throttle) throttle.style.display=spielerImFlugzeug ? 'block' : 'none';
+            if(throttleLabel) throttleLabel.style.display=spielerImFlugzeug ? 'block' : 'none';
+            if(spielerImFlugzeug) aktualisiereSchubAnzeige();
             if(!spielerImFlugzeug && d>=7) btn.style.display='none';
         }
 
@@ -1732,95 +1744,78 @@
             if(spielerImFlugzeug){
                 if(flugzeugGeschwindigkeit>4 || flugzeugObjekt.position.y>4.5) return;
                 spielerImFlugzeug=false;
-                camera.position.set(flugzeugObjekt.position.x+4,2,flugzeugObjekt.position.z);
-                rotationX=0; rotationY=flugzeugObjekt.rotation.y; return;
+                camera.position.set(flugzeugObjekt.position.x-5,Math.max(2,flugzeugObjekt.position.y+1.5),flugzeugObjekt.position.z);
+                rotationX=0; rotationY=flugzeugObjekt.rotation.y;
+                moveInput={x:0,y:0}; lookInput={x:0,y:0}; planeThrottleInput=0.18;
+                return;
             }
             if(camera.position.distanceTo(flugzeugObjekt.position)>7) return;
             spielerImFlugzeug=true;
-            moveInput={x:0,y:0};
-            lookInput={x:0,y:0};
-            flugzeugPitch=0;
-            flugzeugObjekt.rotation.z=0;
-            rotationX=0;
-            rotationY=flugzeugObjekt.rotation.y;
-            flugzeugGeschwindigkeit=0;
+            moveInput={x:0,y:0}; lookInput={x:0,y:0};
+            flugzeugPitch=0; flugzeugGeschwindigkeit=0; flugzeugObjekt.rotation.z=0;
+            planeThrottleInput=0.18;
+            const startQ=new THREE.Quaternion().setFromEuler(new THREE.Euler(0,flugzeugObjekt.rotation.y,0,'YXZ'));
+            camera.position.copy(flugzeugObjekt.position).add(new THREE.Vector3(-12,4.8,0).applyQuaternion(startQ));
+            camera.lookAt(flugzeugObjekt.position.clone().add(new THREE.Vector3(18,1,0).applyQuaternion(startQ)));
+            rotationX=0; rotationY=flugzeugObjekt.rotation.y;
         }
 
         function aktualisiereFlugzeug(delta){
             if(spieler.mission!==4 || !flugzeugObjekt || !spielerImFlugzeug) return;
 
-            // Flugsteuerung:
-            // Linker Stick = Geschwindigkeit und Roll/Lenkung.
-            // Rechter Stick = Nase hoch/runter.
-            const rollInput=moveInput.x;
-            const speedInput=moveInput.y;
-            const pitchInput=-lookInput.y;
-
-            // Kleine Stickbewegungen ignorieren, damit der Jet ruhig bleibt.
-            const deadZone=0.10;
+            // Turboprop-artige Steuerung:
+            // linker Stick = Pitch + Roll
+            // SCHUB-Slider = Geschwindigkeit
+            // rechter Stick links/rechts = Seitenruder
+            const deadZone=0.08;
             const smoothInput=(v)=>{
                 if(Math.abs(v)<deadZone) return 0;
                 return Math.sign(v)*(Math.abs(v)-deadZone)/(1-deadZone);
             };
-            const rollSteer=smoothInput(rollInput);
-            const speedSteer=smoothInput(speedInput);
-            const pitchSteer=smoothInput(pitchInput);
+            const rollInput=smoothInput(moveInput.x);
+            const pitchInput=smoothInput(moveInput.y);
+            const rudderInput=smoothInput(lookInput.x);
 
-            // Linker Stick hoch = beschleunigen, runter = bremsen.
-            flugzeugGeschwindigkeit += speedSteer * 24 * delta;
-            flugzeugGeschwindigkeit = Math.max(0,Math.min(55,flugzeugGeschwindigkeit));
+            const zielGeschwindigkeit=planeThrottleInput*55;
+            flugzeugGeschwindigkeit=THREE.MathUtils.lerp(flugzeugGeschwindigkeit,zielGeschwindigkeit,Math.min(1,delta*2.4));
 
-            // Rechter Stick: runter = Nase hoch, hoch = Nase runter.
-            if(flugzeugObjekt.position.y>3.0){
-                flugzeugPitch += pitchSteer * 0.82 * delta;
-                flugzeugPitch=Math.max(-0.55,Math.min(0.55,flugzeugPitch));
+            // Stick nach unten = Nase hoch, nach oben = Nase runter.
+            if(flugzeugObjekt.position.y>2.9 || pitchInput>0.05){
+                flugzeugPitch += pitchInput*0.78*delta;
+                flugzeugPitch=Math.max(-0.58,Math.min(0.58,flugzeugPitch));
             }
 
-            // Sanftes Rollen und Kurven.
-            flugzeugObjekt.rotation.z=THREE.MathUtils.lerp(
-                flugzeugObjekt.rotation.z,-rollSteer*0.78,Math.min(1,delta*5.5)
-            );
-            flugzeugObjekt.rotation.y -= rollSteer*0.72*delta;
-
-            // Ruhiger Start: keine automatische Pitch-Bewegung.
-            if(flugzeugObjekt.position.y<=3.0){
-                flugzeugObjekt.position.y=2.8;
-                flugzeugPitch=0;
-                if(flugzeugGeschwindigkeit>18 && pitchSteer>0.08) flugzeugPitch=0.10;
-            }
-            const q=new THREE.Quaternion().setFromEuler(
-                new THREE.Euler(flugzeugPitch,flugzeugObjekt.rotation.y,flugzeugObjekt.rotation.z,'YXZ')
-            );
-            const vorwaerts=new THREE.Vector3(1,0,0).applyQuaternion(q);
-            flugzeugObjekt.position.addScaledVector(vorwaerts,flugzeugGeschwindigkeit*delta);
+            flugzeugObjekt.rotation.z=THREE.MathUtils.lerp(flugzeugObjekt.rotation.z,-rollInput*0.72,Math.min(1,delta*5.5));
+            flugzeugObjekt.rotation.y += (rollInput*0.78 + rudderInput*0.24)*delta;
 
             if(flugzeugObjekt.position.y<=2.8){
                 flugzeugObjekt.position.y=2.8;
-                flugzeugPitch=0;
+                if(pitchInput>0.10 && flugzeugGeschwindigkeit>15) flugzeugPitch=Math.max(flugzeugPitch,0.08);
+                else flugzeugPitch=Math.min(flugzeugPitch,0);
             }
 
+            const q=new THREE.Quaternion().setFromEuler(new THREE.Euler(flugzeugPitch,flugzeugObjekt.rotation.y,flugzeugObjekt.rotation.z,'YXZ'));
+            const vorwaerts=new THREE.Vector3(1,0,0).applyQuaternion(q);
+            if(flugzeugGeschwindigkeit>0.8) flugzeugObjekt.position.addScaledVector(vorwaerts,flugzeugGeschwindigkeit*delta);
+
+            if(flugzeugObjekt.position.y<2.8){ flugzeugObjekt.position.y=2.8; flugzeugPitch=0; }
             flugzeugObjekt.position.x=Math.max(-118,Math.min(118,flugzeugObjekt.position.x));
             flugzeugObjekt.position.z=Math.max(-118,Math.min(118,flugzeugObjekt.position.z));
 
-            // Aircombat-Kamera: hinter dem Flugzeug, leicht erhöht.
-            const camOffset=new THREE.Vector3(-11,4.2,0).applyQuaternion(q);
-            const camTarget=flugzeugObjekt.position.clone().addScaledVector(vorwaerts,22);
-            const zielKamera=flugzeugObjekt.position.clone().add(camOffset);
-            // Weiches Kamera-Follow verhindert das Zittern beim Einsteigen.
-            camera.position.lerp(zielKamera,Math.min(1,delta*6));
-            const blickStart=camera.position.clone().add(
-                camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(18)
-            );
-            blickStart.lerp(camTarget,Math.min(1,delta*7));
-            camera.lookAt(blickStart);
+            // Aircombat-artige Chase-Kamera: verzögert und stabil hinter dem Flugzeug.
+            const zielKamera=flugzeugObjekt.position.clone().add(new THREE.Vector3(-12.5,4.8,0).applyQuaternion(q));
+            const blickZiel=flugzeugObjekt.position.clone().add(new THREE.Vector3(24,1,0).applyQuaternion(q));
+            camera.position.lerp(zielKamera,Math.min(1,delta*4.8));
+            const aktuelleBlickrichtung=camera.getWorldDirection(new THREE.Vector3());
+            const aktuellesBlickZiel=camera.position.clone().add(aktuelleBlickrichtung.multiplyScalar(20));
+            aktuellesBlickZiel.lerp(blickZiel,Math.min(1,delta*5.5));
+            camera.lookAt(aktuellesBlickZiel);
 
             const d=flugzeugObjekt.position.distanceTo(flugzeugZielPosition);
             if(d<9 && flugzeugObjekt.position.y<7 && flugzeugGeschwindigkeit<18){
-                flugzeugGeschwindigkeit=0;
-                missionErfolgreich();
+                planeThrottleInput=0; flugzeugGeschwindigkeit=0; missionErfolgreich();
             }
         }
-
 
         function aktualisierePanzerButton(){
             const hud=document.getElementById('hud');
@@ -2478,6 +2473,48 @@
 
         const moveStick = document.getElementById('move-stick');
         const lookStick = document.getElementById('look-stick');
+        const planeThrottle=document.getElementById('plane-throttle');
+        const planeThrottleFill=planeThrottle ? planeThrottle.querySelector('.fill') : null;
+        const planeThrottleKnob=planeThrottle ? planeThrottle.querySelector('.knob') : null;
+        let planeThrottleTouchId=null;
+
+        function aktualisiereSchubAnzeige(){
+            if(!planeThrottle || !planeThrottleFill || !planeThrottleKnob) return;
+            const p=Math.max(0.05,Math.min(1,planeThrottleInput));
+            planeThrottleFill.style.height=(p*100)+'%';
+            planeThrottleKnob.style.bottom=(p*100)+'%';
+        }
+
+        function setzeFlugzeugSchubAusTouch(touch){
+            if(!planeThrottle || !spielerImFlugzeug) return;
+            const rect=planeThrottle.getBoundingClientRect();
+            const y=Math.max(0,Math.min(rect.height,touch.clientY-rect.top));
+            planeThrottleInput=Math.max(0.05,Math.min(1,1-y/rect.height));
+            aktualisiereSchubAnzeige();
+        }
+
+        if(planeThrottle){
+            planeThrottle.addEventListener('touchstart',(e)=>{
+                if(!spielerImFlugzeug) return;
+                e.preventDefault();
+                planeThrottleTouchId=e.changedTouches[0].identifier;
+                setzeFlugzeugSchubAusTouch(e.changedTouches[0]);
+            },{passive:false});
+            planeThrottle.addEventListener('touchmove',(e)=>{
+                if(planeThrottleTouchId===null) return;
+                e.preventDefault();
+                const t=Array.from(e.touches).find(x=>x.identifier===planeThrottleTouchId);
+                if(t) setzeFlugzeugSchubAusTouch(t);
+            },{passive:false});
+            const stopThrottle=(e)=>{
+                if(planeThrottleTouchId===null) return;
+                if(Array.from(e.changedTouches).some(t=>t.identifier===planeThrottleTouchId)) planeThrottleTouchId=null;
+            };
+            planeThrottle.addEventListener('touchend',stopThrottle,{passive:true});
+            planeThrottle.addEventListener('touchcancel',stopThrottle,{passive:true});
+            aktualisiereSchubAnzeige();
+        }
+
         const fireBtn = document.getElementById('fire-btn');
         const canvasContainer = document.getElementById('canvas-container');
 
@@ -3151,7 +3188,7 @@
                 document.getElementById('hud').style.transform = 'translateX(0)';
             }
 
-            if(!spielerImPanzer){
+            if(!spielerImPanzer && !spielerImFlugzeug){
                 rotationY -= lookInput.x * 0.03;
                 rotationX += lookInput.y * 0.03;
                 rotationX = Math.max(-Math.PI/3, Math.min(Math.PI/3, rotationX));
