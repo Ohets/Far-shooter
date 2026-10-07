@@ -1147,52 +1147,89 @@
                 const parts=a.mesh.userData.parts;
                 const walk=Math.sin(a.animTime*5.5+a.walkPhase)*0.45;
 
-                // Verbündete bleiben in deiner Nähe und rücken gemeinsam vor.
-                const ziel=new THREE.Vector3(camera.position.x,0,camera.position.z);
-                const offsetX=(a.index%2?2.2:-2.2);
-                const offsetZ=3.5+Math.floor(a.index/2)*2.0;
-                ziel.x+=offsetX; ziel.z+=offsetZ;
-                const to=ziel.clone().sub(a.mesh.position); to.y=0;
-                if(to.length()>4.0){
-                    to.normalize();
-                    a.mesh.position.addScaledVector(to,delta*1.65);
-                    a.mesh.rotation.y=Math.atan2(to.x,to.z);
-                    if(parts.leftArm&&parts.rightArm){
-                        parts.leftArm.rotation.z=-0.22+walk*0.45;
-                        parts.rightArm.rotation.z=0.22-walk*0.45;
-                    }
-                    if(parts.leftLeg&&parts.rightLeg){
-                        parts.leftLeg.rotation.x=walk*0.65;
-                        parts.rightLeg.rotation.x=-walk*0.65;
-                    }
-                }
+                // Verbündete bilden eine kleine Schutzformation um den Spieler.
+                // Die vorderen Soldaten bleiben etwas weiter vorne, die hinteren sichern die Flanken.
+                const formation=[
+                    {x:-3.2,z:2.2},
+                    {x:3.2,z:2.2},
+                    {x:-2.2,z:5.0},
+                    {x:2.2,z:5.0}
+                ];
+                const slot=formation[a.index%formation.length];
+                const ziel=new THREE.Vector3(
+                    camera.position.x+slot.x,
+                    0,
+                    camera.position.z+slot.z
+                );
+                const to=ziel.clone().sub(a.mesh.position);
+                to.y=0;
+                const distZumSpieler=a.mesh.position.distanceTo(camera.position);
 
-                // Immer den nächsten noch lebenden Gegner auswählen.
+                // Wenn ein Verbündeter zu weit zurückbleibt, holt er schnell zum Spieler auf.
+                const followSpeed=distZumSpieler>14 ? 3.2 : 2.15;
+
+                // Zuerst Gegner suchen, die den Spieler unmittelbar bedrohen.
+                let bedrohung=null;
+                let kleinsteBedrohungsDist=Infinity;
+                gegnerArray.forEach(g=>{
+                    if(g.dying || !g.mesh) return;
+                    const gegnerZumSpieler=g.mesh.position.distanceTo(camera.position);
+                    const gegnerZumAlly=g.mesh.position.distanceTo(a.mesh.position);
+                    if(gegnerZumSpieler<18 && gegnerZumAlly<36 && gegnerZumSpieler<kleinsteBedrohungsDist){
+                        kleinsteBedrohungsDist=gegnerZumSpieler;
+                        bedrohung=g;
+                    }
+                });
+
+                // Falls keine direkte Bedrohung besteht, unterstützt der Soldat den nächsten Gegner.
                 let nearest=null, nearestDist=Infinity;
                 gegnerArray.forEach(g=>{
-                    if(g.dying) return;
+                    if(g.dying || !g.mesh) return;
                     const d=a.mesh.position.distanceTo(g.mesh.position);
                     if(d<nearestDist){nearestDist=d;nearest=g;}
                 });
-                a.target=nearest;
 
-                if(nearest && nearestDist<34){
-                    const look=nearest.mesh.position.clone().sub(a.mesh.position); look.y=0;
+                const zielGegner=bedrohung || (nearestDist<34 ? nearest : null);
+                a.target=zielGegner;
+
+                if(zielGegner){
+                    const look=zielGegner.mesh.position.clone().sub(a.mesh.position);
+                    look.y=0;
+
+                    // Bei einer unmittelbaren Bedrohung geht der Verbündete dem Gegner
+                    // etwas entgegen, bleibt aber zwischen Spieler und Gegner.
+                    if(bedrohung && kleinsteBedrohungsDist>5 && distZumSpieler<16){
+                        const zwischen=camera.position.clone().sub(zielGegner.mesh.position);
+                        zwischen.y=0;
+                        if(zwischen.lengthSq()>0.01){
+                            zwischen.normalize();
+                            const schutzPos=camera.position.clone().addScaledVector(zwischen,5.5);
+                            const schutzTo=schutzPos.clone().sub(a.mesh.position);
+                            schutzTo.y=0;
+                            if(schutzTo.length()>1.5){
+                                schutzTo.normalize();
+                                a.mesh.position.addScaledVector(schutzTo,delta*2.0);
+                            }
+                        }
+                    }
+
                     if(look.lengthSq()>0.01) a.mesh.rotation.y=Math.atan2(look.x,look.z);
+
                     if(parts.leftArm&&parts.rightArm){
                         parts.leftArm.rotation.z=-0.72;
                         parts.rightArm.rotation.z=0.72;
                     }
+
+                    // Verbündeter schießt auf die Bedrohung bzw. den nächsten Gegner.
                     a.shotCooldown-=delta;
                     if(a.shotCooldown<=0){
                         a.shotCooldown=0.75+Math.random()*0.75;
 
-                        // Sichtbarer Schuss vom Gewehr des Verbündeten direkt zum Gegner.
                         const start=a.mesh.position.clone();
                         start.y+=1.65;
                         start.x+=Math.sin(a.mesh.rotation.y)*0.52;
                         start.z+=Math.cos(a.mesh.rotation.y)*0.52;
-                        const ende=nearest.mesh.position.clone();
+                        const ende=zielGegner.mesh.position.clone();
                         ende.y+=1.25;
 
                         const tracerGeom=new THREE.BufferGeometry().setFromPoints([start,ende]);
@@ -1205,24 +1242,51 @@
                             tracerMat.dispose();
                         },120);
 
-                        // Mündungsfeuer und Schussgeräusch.
-                        const flash=new THREE.Mesh(new THREE.SphereGeometry(0.12,6,6),new THREE.MeshBasicMaterial({color:0x66aaff}));
+                        const flash=new THREE.Mesh(
+                            new THREE.SphereGeometry(0.12,6,6),
+                            new THREE.MeshBasicMaterial({color:0x66aaff})
+                        );
                         flash.position.set(0.52,1.65,-1.72);
                         a.mesh.add(flash);
                         setTimeout(()=>{if(flash.parent) flash.parent.remove(flash);},100);
                         playShootSound();
 
-                        // Trefferchance: Verbündete schießen nur auf tatsächlich sichtbare Gegner.
-                        const hitChance=Math.max(0.52,0.86-nearestDist/110);
+                        const hitChance=Math.max(0.52,0.86-a.mesh.position.distanceTo(zielGegner.mesh.position)/110);
                         if(Math.random()<hitChance){
-                            nearest.hp-=20+Math.floor(spieler.mission*0.6);
-                            nearest.flashTimer=0.10;
-                            if(nearest.hp<=0&&!nearest.dying){
-                                nearest.dying=true;
-                                nearest.deathTime=0;
-                                nearest.mesh.userData.deathAwarded=false;
+                            zielGegner.hp-=20+Math.floor(spieler.mission*0.6);
+                            zielGegner.flashTimer=0.10;
+                            if(zielGegner.hp<=0&&!zielGegner.dying){
+                                zielGegner.dying=true;
+                                zielGegner.deathTime=0;
+                                zielGegner.mesh.userData.deathAwarded=false;
                             }
                         }
+                    }
+                } else {
+                    // Keine Gefahr: Formation halten und dem Spieler folgen.
+                    if(to.length()>1.4){
+                        to.normalize();
+                        a.mesh.position.addScaledVector(to,delta*followSpeed);
+                        a.mesh.rotation.y=Math.atan2(to.x,to.z);
+                    }
+                    if(parts.leftArm&&parts.rightArm){
+                        parts.leftArm.rotation.z=-0.22+walk*0.45;
+                        parts.rightArm.rotation.z=0.22-walk*0.45;
+                    }
+                    if(parts.leftLeg&&parts.rightLeg){
+                        parts.leftLeg.rotation.x=walk*0.65;
+                        parts.rightLeg.rotation.x=-walk*0.65;
+                    }
+                }
+
+                // Niemals weiter als nötig vom Spieler entfernen: bei größerer Distanz
+                // wird die Formation priorisiert.
+                if(distZumSpieler>24){
+                    const notfallTo=camera.position.clone().sub(a.mesh.position);
+                    notfallTo.y=0;
+                    if(notfallTo.lengthSq()>0.01){
+                        notfallTo.normalize();
+                        a.mesh.position.addScaledVector(notfallTo,delta*4.5);
                     }
                 }
             });
