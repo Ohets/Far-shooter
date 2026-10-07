@@ -3410,9 +3410,23 @@
                 const plattenRest=panzerZerstoerbareObjekte.some(o=>o.userData.zielTyp==='flugzeugPanzerplatte' && !o.userData.zerstoert);
                 if(!mauerRest) panzerGebietOffen=true;
                 if(aktuellesZiel && aktuellesZiel.typ==='flugzeug'){
-                    if(mauerRest) aktuellesZiel.name='Dringe in das Gebiet ein und zerstöre den Hangar';
-                    else if(plattenRest) aktuellesZiel.name='Zerstöre die Panzerplatten des Hangars';
-                    else aktuellesZiel.name='Finde das geheime Flugzeug im Hangar';
+                    // Die Außenmauer muss nicht komplett zerstört werden.
+                    // Sobald der Panzer durch die offene Zufahrt im Gebiet ist,
+                    // beginnt direkt das Hangar-Ziel.
+                    const gebietCx=85, gebietCz=-85, gebietHalf=32;
+                    const panzerImGebiet = panzerObjekt &&
+                        panzerObjekt.position.x > gebietCx-gebietHalf+3 &&
+                        panzerObjekt.position.x < gebietCx+gebietHalf-3 &&
+                        panzerObjekt.position.z > gebietCz-gebietHalf+3 &&
+                        panzerObjekt.position.z < gebietCz+gebietHalf-3;
+
+                    if(!panzerImGebiet) {
+                        aktuellesZiel.name='Fahre mit dem Panzer durch die Zufahrt in das markierte Gebiet';
+                    } else if(plattenRest) {
+                        aktuellesZiel.name='Zerstöre die Panzerplatten des Hangars';
+                    } else {
+                        aktuellesZiel.name='Finde das geheime Flugzeug im Hangar';
+                    }
                 }
                 if(!plattenRest && geheimesFlugzeug){
                     geheimesFlugzeug.visible=true;
