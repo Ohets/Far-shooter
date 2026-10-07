@@ -1469,17 +1469,32 @@
                 weltKollisionsobjekte.push(o);
             });
 
-            const plateMat=new THREE.MeshLambertMaterial({color:0x596368});
-            const pw=(hw-1.2)/6;
-            for(let i=0;i<6;i++){
-                const plate=new THREE.Mesh(new THREE.BoxGeometry(pw,hh,0.75),plateMat.clone());
-                plate.position.set(-hw/2+0.6+pw*(i+0.5),hh/2,hd/2);
-                plate.castShadow=true; plate.receiveShadow=true;
-                plate.userData.zielTyp='flugzeugPanzerplatte';
-                plate.userData.hp=120; plate.userData.maxHp=120; plate.userData.zerstoert=false;
-                hangar.add(plate);
-                panzerZerstoerbareObjekte.push(plate);
-                weltKollisionsobjekte.push(plate);
+            // Nur die beiden langen Seiten des Hangars sind gepanzert.
+            // Die Front bleibt offen, damit nach dem Zerstören der Seitenplatten
+            // das geheime Flugzeug sichtbar und erreichbar ist.
+            const plateMat=new THREE.MeshLambertMaterial({color:0x596368,metalness:0.25,roughness:0.42});
+            const sideSegment=(hd-1.2)/3;
+            for(const sideX of [-hw/2,hw/2]){
+                for(let i=0;i<3;i++){
+                    const plate=new THREE.Mesh(
+                        new THREE.BoxGeometry(0.78,hh,sideSegment),
+                        plateMat.clone()
+                    );
+                    plate.position.set(
+                        sideX,
+                        hh/2,
+                        -hd/2+0.6+sideSegment*(i+0.5)
+                    );
+                    plate.castShadow=true;
+                    plate.receiveShadow=true;
+                    plate.userData.zielTyp='flugzeugPanzerplatte';
+                    plate.userData.hp=120;
+                    plate.userData.maxHp=120;
+                    plate.userData.zerstoert=false;
+                    hangar.add(plate);
+                    panzerZerstoerbareObjekte.push(plate);
+                    weltKollisionsobjekte.push(plate);
+                }
             }
 
             const roof=new THREE.Mesh(new THREE.BoxGeometry(hw+1,0.6,hd+1),new THREE.MeshLambertMaterial({color:0x202629}));
@@ -2343,6 +2358,65 @@
             e.stopPropagation();
         }, {passive:false});
 
+        function zeigePanzerplattenTreffer(objekt){
+            if(!objekt || !objekt.parent) return;
+
+            const punkt=new THREE.Vector3();
+            objekt.getWorldPosition(punkt);
+
+            // Heller Metallblitz direkt am Einschlag.
+            const flash=new THREE.Mesh(
+                new THREE.SphereGeometry(0.24,8,8),
+                new THREE.MeshBasicMaterial({color:0xfff1b0,transparent:true,opacity:1})
+            );
+            flash.position.copy(punkt);
+            scene.add(flash);
+
+            // Kleine Funken fliegen vom Einschlagspunkt weg.
+            const funken=[];
+            for(let i=0;i<9;i++){
+                const funke=new THREE.Mesh(
+                    new THREE.SphereGeometry(0.055+Math.random()*0.045,5,5),
+                    new THREE.MeshBasicMaterial({color:i%2 ? 0xff8a22 : 0xffe28a,transparent:true,opacity:1})
+                );
+                funke.position.copy(punkt);
+                funke.userData.vel=new THREE.Vector3(
+                    (Math.random()-0.5)*5.5,
+                    0.8+Math.random()*4.2,
+                    (Math.random()-0.5)*5.5
+                );
+                scene.add(funke);
+                funken.push(funke);
+            }
+
+            const start=performance.now();
+            const tick=()=>{
+                const t=Math.min((performance.now()-start)/360,1);
+                flash.scale.setScalar(1+3*t);
+                flash.material.opacity=1-t;
+
+                for(const funke of funken){
+                    funke.position.addScaledVector(funke.userData.vel,0.016);
+                    funke.userData.vel.y-=0.14;
+                    funke.material.opacity=1-t;
+                }
+
+                if(t<1){
+                    requestAnimationFrame(tick);
+                }else{
+                    scene.remove(flash);
+                    flash.geometry.dispose();
+                    flash.material.dispose();
+                    funken.forEach(funke=>{
+                        scene.remove(funke);
+                        funke.geometry.dispose();
+                        funke.material.dispose();
+                    });
+                }
+            };
+            tick();
+        }
+
         function feuerWaffe() {
             if(spielerImPanzer){
                 if(panzerFeuerCooldown>0 || !panzerObjekt) return;
@@ -2376,6 +2450,7 @@
                         objekt.getWorldPosition(objektWeltPosition);
                         const distanz=objektWeltPosition.distanceTo(explosionsPunkt);
                         if(distanz<=explosionsRadius){
+                            zeigePanzerplattenTreffer(objekt);
                             const falloff=1-Math.min(distanz/explosionsRadius,1);
                             objekt.userData.hp-=Math.round(110+190*falloff);
                             if(objekt.material && objekt.material.color) objekt.material.color.setHex(0x747d80);
