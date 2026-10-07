@@ -1500,6 +1500,56 @@
             const roof=new THREE.Mesh(new THREE.BoxGeometry(hw+1,0.6,hd+1),new THREE.MeshLambertMaterial({color:0x202629}));
             roof.position.y=hh+0.3; hangar.add(roof);
 
+            // Deutliche Markierung des Hangars innerhalb der Außenmauer.
+            const hangarMarker=new THREE.Group();
+            const markerRing=new THREE.Mesh(
+                new THREE.RingGeometry(24,25,48),
+                new THREE.MeshBasicMaterial({color:0xffc400,side:THREE.DoubleSide,transparent:true,opacity:0.28})
+            );
+            markerRing.rotation.x=-Math.PI/2;
+            markerRing.position.y=0.08;
+            hangarMarker.add(markerRing);
+
+            const markerBeacon=new THREE.Mesh(
+                new THREE.CylinderGeometry(0.16,0.16,5.5,8),
+                new THREE.MeshBasicMaterial({color:0xffc400,transparent:true,opacity:0.8})
+            );
+            markerBeacon.position.y=2.75;
+            hangarMarker.add(markerBeacon);
+
+            const markerTop=new THREE.Mesh(
+                new THREE.TorusGeometry(1.2,0.08,8,24),
+                new THREE.MeshBasicMaterial({color:0xffc400})
+            );
+            markerTop.rotation.x=Math.PI/2;
+            markerTop.position.y=5.5;
+            hangarMarker.add(markerTop);
+
+            const markerCanvas=document.createElement('canvas');
+            markerCanvas.width=512;
+            markerCanvas.height=96;
+            const markerCtx=markerCanvas.getContext('2d');
+            markerCtx.fillStyle='rgba(0,0,0,0.82)';
+            markerCtx.fillRect(0,0,512,96);
+            markerCtx.fillStyle='#ffd400';
+            markerCtx.font='bold 34px sans-serif';
+            markerCtx.textAlign='center';
+            markerCtx.fillText('HANGAR – ZIEL',256,58);
+
+            const markerLabel=new THREE.Sprite(
+                new THREE.SpriteMaterial({
+                    map:new THREE.CanvasTexture(markerCanvas),
+                    transparent:true,
+                    depthTest:false
+                })
+            );
+            markerLabel.scale.set(7.5,1.4,1);
+            markerLabel.position.y=7.0;
+            hangarMarker.add(markerLabel);
+
+            hangarMarker.position.set(cx,0,cz);
+            szenerieGruppe.add(hangarMarker);
+
             // Großes modernes Geheimflugzeug mit aggressiver Jet-Silhouette.
             const aircraft=new THREE.Group();
             const bodyMat=new THREE.MeshLambertMaterial({color:0x3f464a});
