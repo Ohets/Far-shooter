@@ -1742,33 +1742,35 @@
         function aktualisiereFlugzeug(delta){
             if(spieler.mission!==4 || !flugzeugObjekt || !spielerImFlugzeug) return;
 
-            // Aircombat-Steuerung: linker Stick steuert direkt Pitch und Roll.
-            // Nach dem Start fliegt der Jet automatisch vorwärts.
+            // Flugsteuerung:
+            // Linker Stick = Geschwindigkeit und Roll/Lenkung.
+            // Rechter Stick = Nase hoch/runter.
             const rollInput=moveInput.x;
-            const pitchInput=moveInput.y;
+            const speedInput=moveInput.y;
+            const pitchInput=-lookInput.y;
 
-            if(flugzeugObjekt.position.y<=3.0){
-                flugzeugGeschwindigkeit += 14*delta;
-                flugzeugGeschwindigkeit=Math.min(42,Math.max(12,flugzeugGeschwindigkeit));
-                flugzeugObjekt.rotation.z = -rollInput*0.72;
-                flugzeugPitch = 0;
-                if(flugzeugGeschwindigkeit>18 && pitchInput>0.18){
-                    flugzeugObjekt.position.y=3.15;
-                    flugzeugPitch=0.08;
+            // Linker Stick nach oben = beschleunigen, nach unten = abbremsen.
+            flugzeugGeschwindigkeit += speedInput * 24 * delta;
+            flugzeugGeschwindigkeit = Math.max(0, Math.min(55, flugzeugGeschwindigkeit));
+
+            // Rechter Stick nach unten = Nase hoch, nach oben = Nase runter.
+            flugzeugPitch += pitchInput * 1.15 * delta;
+            flugzeugPitch = Math.max(-0.65, Math.min(0.65, flugzeugPitch));
+
+            // Links/rechts mit dem linken Stick = Rollen und Kurven.
+            flugzeugObjekt.rotation.z = THREE.MathUtils.lerp(
+                flugzeugObjekt.rotation.z,
+                -rollInput * 0.95,
+                Math.min(1,delta*7)
+            );
+            flugzeugObjekt.rotation.y -= rollInput * 0.95 * delta;
+
+            // Für den Start muss genug Geschwindigkeit vorhanden sein.
+            if(flugzeugObjekt.position.y <= 3.0){
+                flugzeugObjekt.position.y = 2.8;
+                if(flugzeugGeschwindigkeit > 18 && pitchInput > 0.10){
+                    flugzeugPitch = Math.max(flugzeugPitch,0.08);
                 }
-                flugzeugObjekt.rotation.y -= rollInput*0.9*delta;
-            }else{
-                flugzeugGeschwindigkeit=Math.min(50,flugzeugGeschwindigkeit+8*delta);
-                // Wie im Aircombat-Repository:
-                // Stick nach unten = Nase hoch, Stick nach oben = Nase runter.
-                flugzeugPitch += pitchInput*0.95*delta;
-                flugzeugPitch=Math.max(-0.55,Math.min(0.55,flugzeugPitch));
-                flugzeugObjekt.rotation.z = THREE.MathUtils.lerp(
-                    flugzeugObjekt.rotation.z,
-                    -rollInput*0.95,
-                    Math.min(1,delta*7)
-                );
-                flugzeugObjekt.rotation.y -= rollInput*0.95*delta;
             }
 
             const q=new THREE.Quaternion().setFromEuler(
