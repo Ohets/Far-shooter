@@ -1736,7 +1736,14 @@
                 rotationX=0; rotationY=flugzeugObjekt.rotation.y; return;
             }
             if(camera.position.distanceTo(flugzeugObjekt.position)>7) return;
-            spielerImFlugzeug=true; rotationX=0; rotationY=flugzeugObjekt.rotation.y;
+            spielerImFlugzeug=true;
+            moveInput={x:0,y:0};
+            lookInput={x:0,y:0};
+            flugzeugPitch=0;
+            flugzeugObjekt.rotation.z=0;
+            rotationX=0;
+            rotationY=flugzeugObjekt.rotation.y;
+            flugzeugGeschwindigkeit=0;
         }
 
         function aktualisiereFlugzeug(delta){
@@ -1749,30 +1756,38 @@
             const speedInput=moveInput.y;
             const pitchInput=-lookInput.y;
 
-            // Linker Stick nach oben = beschleunigen, nach unten = abbremsen.
-            flugzeugGeschwindigkeit += speedInput * 24 * delta;
-            flugzeugGeschwindigkeit = Math.max(0, Math.min(55, flugzeugGeschwindigkeit));
+            // Kleine Stickbewegungen ignorieren, damit der Jet ruhig bleibt.
+            const deadZone=0.10;
+            const smoothInput=(v)=>{
+                if(Math.abs(v)<deadZone) return 0;
+                return Math.sign(v)*(Math.abs(v)-deadZone)/(1-deadZone);
+            };
+            const rollSteer=smoothInput(rollInput);
+            const speedSteer=smoothInput(speedInput);
+            const pitchSteer=smoothInput(pitchInput);
 
-            // Rechter Stick nach unten = Nase hoch, nach oben = Nase runter.
-            flugzeugPitch += pitchInput * 1.15 * delta;
-            flugzeugPitch = Math.max(-0.65, Math.min(0.65, flugzeugPitch));
+            // Linker Stick hoch = beschleunigen, runter = bremsen.
+            flugzeugGeschwindigkeit += speedSteer * 24 * delta;
+            flugzeugGeschwindigkeit = Math.max(0,Math.min(55,flugzeugGeschwindigkeit));
 
-            // Links/rechts mit dem linken Stick = Rollen und Kurven.
-            flugzeugObjekt.rotation.z = THREE.MathUtils.lerp(
-                flugzeugObjekt.rotation.z,
-                -rollInput * 0.95,
-                Math.min(1,delta*7)
-            );
-            flugzeugObjekt.rotation.y -= rollInput * 0.95 * delta;
-
-            // Für den Start muss genug Geschwindigkeit vorhanden sein.
-            if(flugzeugObjekt.position.y <= 3.0){
-                flugzeugObjekt.position.y = 2.8;
-                if(flugzeugGeschwindigkeit > 18 && pitchInput > 0.10){
-                    flugzeugPitch = Math.max(flugzeugPitch,0.08);
-                }
+            // Rechter Stick: runter = Nase hoch, hoch = Nase runter.
+            if(flugzeugObjekt.position.y>3.0){
+                flugzeugPitch += pitchSteer * 0.82 * delta;
+                flugzeugPitch=Math.max(-0.55,Math.min(0.55,flugzeugPitch));
             }
 
+            // Sanftes Rollen und Kurven.
+            flugzeugObjekt.rotation.z=THREE.MathUtils.lerp(
+                flugzeugObjekt.rotation.z,-rollSteer*0.78,Math.min(1,delta*5.5)
+            );
+            flugzeugObjekt.rotation.y -= rollSteer*0.72*delta;
+
+            // Ruhiger Start: keine automatische Pitch-Bewegung.
+            if(flugzeugObjekt.position.y<=3.0){
+                flugzeugObjekt.position.y=2.8;
+                flugzeugPitch=0;
+                if(flugzeugGeschwindigkeit>18 && pitchSteer>0.08) flugzeugPitch=0.10;
+            }
             const q=new THREE.Quaternion().setFromEuler(
                 new THREE.Euler(flugzeugPitch,flugzeugObjekt.rotation.y,flugzeugObjekt.rotation.z,'YXZ')
             );
@@ -1790,8 +1805,14 @@
             // Aircombat-Kamera: hinter dem Flugzeug, leicht erhöht.
             const camOffset=new THREE.Vector3(-11,4.2,0).applyQuaternion(q);
             const camTarget=flugzeugObjekt.position.clone().addScaledVector(vorwaerts,22);
-            camera.position.copy(flugzeugObjekt.position).add(camOffset);
-            camera.lookAt(camTarget);
+            const zielKamera=flugzeugObjekt.position.clone().add(camOffset);
+            // Weiches Kamera-Follow verhindert das Zittern beim Einsteigen.
+            camera.position.lerp(zielKamera,Math.min(1,delta*6));
+            const blickStart=camera.position.clone().add(
+                camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(18)
+            );
+            blickStart.lerp(camTarget,Math.min(1,delta*7));
+            camera.lookAt(blickStart);
 
             const d=flugzeugObjekt.position.distanceTo(flugzeugZielPosition);
             if(d<9 && flugzeugObjekt.position.y<7 && flugzeugGeschwindigkeit<18){
