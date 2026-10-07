@@ -53,7 +53,7 @@
     </div>
     
     <div id="mission-info" class="ui-element">
-        Mission <span id="mission-num">1</span>/11<br>
+        Mission <span id="mission-num">1</span>/12<br>
         Ziel: <span id="objective-text">Eliminiere alle Gegner</span>
     </div>
     <div id="alarm-banner">🚨 ALARM! 🚨<br><small>Alle Wachen greifen an!</small></div>
@@ -69,7 +69,7 @@
     <div id="level-menu">
         <button class="close-btn" onclick="toggleLevelMenu()">X Schließen</button>
         <h2>🎯 Level auswählen</h2>
-        <p>Wähle direkt eine der 10 Einsatzmissionen.</p>
+        <p>Wähle direkt eine der 12 Einsatzmissionen.</p>
         <div id="level-grid"></div>
     </div>
 
@@ -1973,9 +1973,6 @@
                 zielZone = zone;
                 scene.add(zone);
 
-                // Die Soldaten werden dem Missionsmarker zugewiesen und beschützen ihn.
-                if(spieler.mission===12) updateVerbuendete(delta);
-
             gegnerArray.forEach(g => {
                     g.schutzpunkt = zone.position.clone();
                 });
@@ -2610,6 +2607,9 @@
                     }
                 }
             });
+
+            // Mission 12: Verbündete werden fortlaufend aktualisiert.
+            if(spieler.mission===12) updateVerbuendete(delta);
 
             // Dynamische Schatten/Realismus: neue Szenenobjekte einmalig für Schatten vorbereiten.
             if(!scene.userData.schattierungVorbereitet) {
