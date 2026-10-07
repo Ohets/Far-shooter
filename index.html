@@ -1185,21 +1185,44 @@
                     }
                     a.shotCooldown-=delta;
                     if(a.shotCooldown<=0){
-                        a.shotCooldown=1.0+Math.random()*1.0;
-                        const hitChance=Math.max(0.45,0.78-nearestDist/120);
+                        a.shotCooldown=0.75+Math.random()*0.75;
+
+                        // Sichtbarer Schuss vom Gewehr des Verbündeten direkt zum Gegner.
+                        const start=a.mesh.position.clone();
+                        start.y+=1.65;
+                        start.x+=Math.sin(a.mesh.rotation.y)*0.52;
+                        start.z+=Math.cos(a.mesh.rotation.y)*0.52;
+                        const ende=nearest.mesh.position.clone();
+                        ende.y+=1.25;
+
+                        const tracerGeom=new THREE.BufferGeometry().setFromPoints([start,ende]);
+                        const tracerMat=new THREE.LineBasicMaterial({color:0x66aaff,transparent:true,opacity:0.95});
+                        const tracer=new THREE.Line(tracerGeom,tracerMat);
+                        scene.add(tracer);
+                        setTimeout(()=>{
+                            if(tracer.parent) tracer.parent.remove(tracer);
+                            tracerGeom.dispose();
+                            tracerMat.dispose();
+                        },120);
+
+                        // Mündungsfeuer und Schussgeräusch.
+                        const flash=new THREE.Mesh(new THREE.SphereGeometry(0.12,6,6),new THREE.MeshBasicMaterial({color:0x66aaff}));
+                        flash.position.set(0.52,1.65,-1.72);
+                        a.mesh.add(flash);
+                        setTimeout(()=>{if(flash.parent) flash.parent.remove(flash);},100);
+                        playShootSound();
+
+                        // Trefferchance: Verbündete schießen nur auf tatsächlich sichtbare Gegner.
+                        const hitChance=Math.max(0.52,0.86-nearestDist/110);
                         if(Math.random()<hitChance){
-                            nearest.hp-=18+Math.floor(spieler.mission*0.5);
-                            nearest.flashTimer=0.08;
+                            nearest.hp-=20+Math.floor(spieler.mission*0.6);
+                            nearest.flashTimer=0.10;
                             if(nearest.hp<=0&&!nearest.dying){
                                 nearest.dying=true;
                                 nearest.deathTime=0;
                                 nearest.mesh.userData.deathAwarded=false;
                             }
                         }
-                        const flash=new THREE.Mesh(new THREE.SphereGeometry(0.10,6,6),new THREE.MeshBasicMaterial({color:0x66aaff}));
-                        flash.position.set(0.52,1.65,-1.72);
-                        a.mesh.add(flash);
-                        setTimeout(()=>{if(flash.parent) flash.parent.remove(flash);},90);
                     }
                 }
             });
