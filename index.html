@@ -1175,7 +1175,8 @@
                     shootAnimTime: 0,
                     shootRecoil: 0,
                     entdeckt: false,
-                    entdeckungsZeit: 0
+                    entdeckungsZeit: 0,
+                    schutzpunkt: null
                 });
             }
             ausgebenUI();
@@ -1321,6 +1322,11 @@
                 zone.position.set(Math.random()*170-85, 0.04, Math.random()*170-85);
                 zielZone = zone;
                 scene.add(zone);
+
+                // Die Soldaten werden dem Missionsmarker zugewiesen und beschützen ihn.
+                gegnerArray.forEach(g => {
+                    g.schutzpunkt = zone.position.clone();
+                });
             }
             ausgebenUI();
         }
@@ -1614,14 +1620,48 @@
                     }
                 }
 
-                // Noch nicht entdeckt: stehen bleiben und nur leicht atmen.
+                // Noch nicht entdeckt: Marker bewachen. Die Soldaten bleiben in der Nähe
+                // des Missionsziels und kehren dorthin zurück, wenn sie zu weit weg sind.
                 if(!g.entdeckt) {
-                    g.mesh.position.copy(g.spawnPosition);
-                    g.mesh.rotation.y = Math.sin(g.animTime * 0.4 + g.walkPhase) * 0.12;
+                    if(g.schutzpunkt) {
+                        const zurMarkierung = new THREE.Vector3().subVectors(g.schutzpunkt, g.mesh.position);
+                        zurMarkierung.y = 0;
+                        const distZurMarkierung = zurMarkierung.length();
+                        if(distZurMarkierung > 11) {
+                            zurMarkierung.normalize();
+                            g.mesh.position.addScaledVector(zurMarkierung, delta * 1.15);
+                            g.mesh.rotation.y = Math.atan2(zurMarkierung.x, zurMarkierung.z);
+                        } else {
+                            g.mesh.rotation.y = Math.sin(g.animTime * 0.4 + g.walkPhase) * 0.12;
+                        }
+                    } else {
+                        g.mesh.position.copy(g.spawnPosition);
+                        g.mesh.rotation.y = Math.sin(g.animTime * 0.4 + g.walkPhase) * 0.12;
+                    }
                     return;
                 }
 
-                // Verhalten 1: Angreifer - rennt direkt auf den Spieler zu
+                // Beschützer bleiben an der Markierung: sie verfolgen den Spieler
+                // nicht endlos durch die ganze Karte.
+                if(g.schutzpunkt) {
+                    const distZurMarkierung = g.mesh.position.distanceTo(g.schutzpunkt);
+                    const spielerZurMarkierung = camera.position.distanceTo(g.schutzpunkt);
+                    if(spielerZurMarkierung > 30 && distZurMarkierung > 15) {
+                        g.entdeckt = false;
+                        g.shotCooldown = 1.0;
+                        return;
+                    }
+                    if(distZurMarkierung > 18 && dist > 10) {
+                        const zurMarkierung = new THREE.Vector3().subVectors(g.schutzpunkt, g.mesh.position);
+                        zurMarkierung.y = 0;
+                        if(zurMarkierung.lengthSq() > 0.01) {
+                            zurMarkierung.normalize();
+                            g.mesh.position.addScaledVector(zurMarkierung, delta * 1.35);
+                        }
+                    }
+                }
+
+                // Verhalten 1: Angreifer - verteidigt den Marker und greift den Spieler an
                 // Verhalten 2: Scharfschütze - hält Abstand und schießt aus der Distanz
                 // Verhalten 3: Flanker - versucht seitlich um den Spieler herumzukommen
                 // Verhalten 4: Verteidiger - bleibt eher bei seinem Startgebiet und greift dort an
@@ -1629,7 +1669,9 @@
 
                 if(g.verhalten === "angreifer") {
                     ziel.copy(camera.position);
-                    if(dist > 6) {
+                    // Ein Angreifer darf den Schutzbereich nicht verlassen.
+                    const schutzDist = g.schutzpunkt ? g.mesh.position.distanceTo(g.schutzpunkt) : 0;
+                    if(dist > 6 && (!g.schutzpunkt || schutzDist < 18)) {
                         richtung.normalize();
                         g.mesh.position.addScaledVector(richtung, delta * (2.0 + spieler.mission * 0.12));
                     }
