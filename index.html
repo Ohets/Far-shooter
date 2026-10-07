@@ -2179,24 +2179,65 @@
                 panzerFeuerCooldown=0.85;
                 playShootSound();
 
+                // Panzergranate: Einschlagspunkt + starke Explosionswirkung.
                 const raycaster=new THREE.Raycaster();
                 raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
-                const intersects=raycaster.intersectObjects(gegnerArray.map(g=>g.mesh),true);
+                const gegnerMeshes=gegnerArray.filter(g=>g && !g.dying).map(g=>g.mesh);
+                const intersects=raycaster.intersectObjects(gegnerMeshes,true);
+
+                let explosionsPunkt=null;
                 if(intersects.length>0){
-                    const getroffenMesh=intersects[0].object;
-                    const gegner=gegnerArray.find(g=>g.mesh===getroffenMesh || g.mesh.getObjectById(getroffenMesh.id));
-                    if(gegner){
-                        playHitSound();
-                        gegner.hp-=95;
-                        gegner.mesh.userData.parts.uniformMat.color.setHex(0xffffff);
-                        gegner.flashTimer=0.1;
-                        if(gegner.hp<=0 && !gegner.dying){
-                            gegner.dying=true;
-                            gegner.deathTime=0;
-                            gegner.mesh.userData.deathAwarded=false;
+                    explosionsPunkt=intersects[0].point.clone();
+                } else {
+                    const richtung=new THREE.Vector3();
+                    camera.getWorldDirection(richtung);
+                    explosionsPunkt=camera.position.clone().addScaledVector(richtung,70);
+                }
+
+                const explosionsRadius=11.5;
+                for(const g of gegnerArray){
+                    if(!g || g.dying || !g.mesh) continue;
+                    const zielPunkt=g.mesh.position.clone();
+                    zielPunkt.y+=1.35;
+                    const distanz=zielPunkt.distanceTo(explosionsPunkt);
+
+                    if(distanz<=explosionsRadius){
+                        const falloff=1-Math.min(distanz/explosionsRadius,1);
+                        const schaden=Math.round(180 + 320*falloff);
+                        g.hp-=schaden;
+                        g.flashTimer=0.16;
+                        if(g.mesh.userData.parts && g.mesh.userData.parts.uniformMat){
+                            g.mesh.userData.parts.uniformMat.color.setHex(0xffffff);
+                        }
+                        if(g.hp<=0 && !g.dying){
+                            g.dying=true;
+                            g.deathTime=0;
+                            g.mesh.userData.deathAwarded=false;
                         }
                     }
                 }
+
+                // Sichtbarer kurzer Explosionsblitz am Einschlag.
+                const explosion=new THREE.Mesh(
+                    new THREE.SphereGeometry(1.0,12,10),
+                    new THREE.MeshBasicMaterial({color:0xff8a22,transparent:true,opacity:0.88})
+                );
+                explosion.position.copy(explosionsPunkt);
+                scene.add(explosion);
+                const explosionStart=performance.now();
+                const explosionTick=()=>{
+                    const t=Math.min((performance.now()-explosionStart)/260,1);
+                    explosion.scale.setScalar(1+t*8);
+                    explosion.material.opacity=0.88*(1-t);
+                    if(t<1) requestAnimationFrame(explosionTick);
+                    else {
+                        scene.remove(explosion);
+                        explosion.geometry.dispose();
+                        explosion.material.dispose();
+                    }
+                };
+                explosionTick();
+
                 ausgebenUI();
                 return;
             }
