@@ -81,13 +81,14 @@
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
         function playShootSound() {
+            // Kurzer, trockener Mündungsknall für mehr Waffenfeedback.
             if (audioCtx.state === 'suspended') audioCtx.resume();
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.connect(gain);
             gain.connect(audioCtx.destination);
 
-            osc.type = 'sawtooth';
+            osc.type = 'square';
             osc.frequency.setValueAtTime(400, audioCtx.currentTime);
             osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.15);
 
@@ -344,21 +345,35 @@
         
         // --- THREE.JS SETUP ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x223344);
-        scene.fog = new THREE.FogExp2(0x223344, 0.015);
+        scene.background = new THREE.Color(0x33404a);
+        scene.fog = new THREE.FogExp2(0x33404a, 0.019);
 
         const camera = new THREE.PerspectiveCamera(normaleFov, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 0.92;
         document.getElementById('canvas-container').appendChild(renderer.domElement);
 
         // Regen jetzt sicher initialisieren: scene und camera sind bereits erstellt.
         erstelleRegen();
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.48);
         scene.add(ambientLight);
         const dirLight = new THREE.DirectionalLight(0xfff1d0, 1.0);
         dirLight.position.set(-30, 60, 25);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
+        dirLight.shadow.camera.near = 1;
+        dirLight.shadow.camera.far = 180;
+        dirLight.shadow.camera.left = -80;
+        dirLight.shadow.camera.right = 80;
+        dirLight.shadow.camera.top = 80;
+        dirLight.shadow.camera.bottom = -80;
         scene.add(dirLight);
 
         // --- MISSIONS-SZENERIEN ---
@@ -1953,6 +1968,17 @@
                     }
                 }
             });
+
+            // Dynamische Schatten/Realismus: neue Szenenobjekte einmalig für Schatten vorbereiten.
+            if(!scene.userData.schattierungVorbereitet) {
+                scene.traverse(obj => {
+                    if(obj.isMesh) {
+                        obj.castShadow = true;
+                        obj.receiveShadow = true;
+                    }
+                });
+                scene.userData.schattierungVorbereitet = true;
+            }
 
             renderer.render(scene, camera);
         }
