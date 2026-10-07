@@ -1671,6 +1671,25 @@
                 geheimesFlugzeug.position.set(85,2.8,92);
                 geheimesFlugzeug.rotation.set(0,Math.PI/2,0);
                 flugzeugObjekt=geheimesFlugzeug;
+
+                // Ausgeklappte Tragflächen für den Flug in Mission 4.
+                const wingMat=new THREE.MeshLambertMaterial({color:0x3f464a,metalness:0.25,roughness:0.42});
+                const wingL=new THREE.Mesh(new THREE.BoxGeometry(5.8,0.18,3.8),wingMat);
+                wingL.position.set(-0.8,0.0,2.45);
+                wingL.rotation.y=-0.10;
+                geheimesFlugzeug.add(wingL);
+                const wingR=wingL.clone();
+                wingR.position.z=-2.45;
+                wingR.rotation.y=0.10;
+                geheimesFlugzeug.add(wingR);
+                const wingTipL=new THREE.Mesh(new THREE.BoxGeometry(3.4,0.14,1.8),wingMat);
+                wingTipL.position.set(1.7,0.02,5.0);
+                wingTipL.rotation.y=-0.22;
+                geheimesFlugzeug.add(wingTipL);
+                const wingTipR=wingTipL.clone();
+                wingTipR.position.z=-5.0;
+                wingTipR.rotation.y=0.22;
+                geheimesFlugzeug.add(wingTipR);
             }
             szenerieGruppe.traverse(o=>{
                 if(o.userData && o.userData.missionMarker) o.visible=false;
@@ -1722,30 +1741,63 @@
 
         function aktualisiereFlugzeug(delta){
             if(spieler.mission!==4 || !flugzeugObjekt || !spielerImFlugzeug) return;
-            const gas=Math.max(0,moveInput.y), bremsen=Math.max(0,-moveInput.y);
+
+            // Aircombat-Steuerung: linker Stick steuert direkt Pitch und Roll.
+            // Nach dem Start fliegt der Jet automatisch vorwärts.
+            const rollInput=moveInput.x;
+            const pitchInput=moveInput.y;
+
             if(flugzeugObjekt.position.y<=3.0){
-                flugzeugGeschwindigkeit+=gas*24*delta;
-                flugzeugGeschwindigkeit-=bremsen*30*delta+3*delta;
-                flugzeugGeschwindigkeit=Math.max(0,Math.min(42,flugzeugGeschwindigkeit));
-                flugzeugObjekt.rotation.y-=moveInput.x*0.75*delta*(0.4+flugzeugGeschwindigkeit/20);
-                flugzeugPitch=0;
-                if(flugzeugGeschwindigkeit>14 && lookInput.y>0.12){ flugzeugObjekt.position.y=3.05; flugzeugPitch=0.08; }
+                flugzeugGeschwindigkeit += 14*delta;
+                flugzeugGeschwindigkeit=Math.min(42,Math.max(12,flugzeugGeschwindigkeit));
+                flugzeugObjekt.rotation.z = -rollInput*0.72;
+                flugzeugPitch = 0;
+                if(flugzeugGeschwindigkeit>18 && pitchInput>0.18){
+                    flugzeugObjekt.position.y=3.15;
+                    flugzeugPitch=0.08;
+                }
+                flugzeugObjekt.rotation.y -= rollInput*0.9*delta;
             }else{
-                flugzeugGeschwindigkeit=Math.max(7,Math.min(50,flugzeugGeschwindigkeit-bremsen*10*delta-0.7*delta));
-                flugzeugPitch=Math.max(-0.28,Math.min(0.42,flugzeugPitch+lookInput.y*0.72*delta));
-                flugzeugObjekt.rotation.y-=lookInput.x*0.75*delta;
+                flugzeugGeschwindigkeit=Math.min(50,flugzeugGeschwindigkeit+8*delta);
+                // Wie im Aircombat-Repository:
+                // Stick nach unten = Nase hoch, Stick nach oben = Nase runter.
+                flugzeugPitch += pitchInput*0.95*delta;
+                flugzeugPitch=Math.max(-0.55,Math.min(0.55,flugzeugPitch));
+                flugzeugObjekt.rotation.z = THREE.MathUtils.lerp(
+                    flugzeugObjekt.rotation.z,
+                    -rollInput*0.95,
+                    Math.min(1,delta*7)
+                );
+                flugzeugObjekt.rotation.y -= rollInput*0.95*delta;
             }
-            const q=new THREE.Quaternion().setFromEuler(new THREE.Euler(flugzeugPitch,flugzeugObjekt.rotation.y,0,'YXZ'));
+
+            const q=new THREE.Quaternion().setFromEuler(
+                new THREE.Euler(flugzeugPitch,flugzeugObjekt.rotation.y,flugzeugObjekt.rotation.z,'YXZ')
+            );
             const vorwaerts=new THREE.Vector3(1,0,0).applyQuaternion(q);
-            if(flugzeugObjekt.position.y>3) vorwaerts.y-=0.20;
             flugzeugObjekt.position.addScaledVector(vorwaerts,flugzeugGeschwindigkeit*delta);
-            if(flugzeugObjekt.position.y<=3){ flugzeugObjekt.position.y=2.8; flugzeugPitch=0; }
+
+            if(flugzeugObjekt.position.y<=2.8){
+                flugzeugObjekt.position.y=2.8;
+                flugzeugPitch=0;
+            }
+
             flugzeugObjekt.position.x=Math.max(-118,Math.min(118,flugzeugObjekt.position.x));
             flugzeugObjekt.position.z=Math.max(-118,Math.min(118,flugzeugObjekt.position.z));
-            const camOffset=new THREE.Vector3(-10,3.8,-0.4).applyQuaternion(q);
+
+            // Aircombat-Kamera: hinter dem Flugzeug, leicht erhöht.
+            const camOffset=new THREE.Vector3(-11,4.2,0).applyQuaternion(q);
+            const camTarget=flugzeugObjekt.position.clone().addScaledVector(vorwaerts,22);
             camera.position.copy(flugzeugObjekt.position).add(camOffset);
-            camera.lookAt(flugzeugObjekt.position.clone().addScaledVector(vorwaerts,28));
+            camera.lookAt(camTarget);
+
+            const d=flugzeugObjekt.position.distanceTo(flugzeugZielPosition);
+            if(d<9 && flugzeugObjekt.position.y<7 && flugzeugGeschwindigkeit<18){
+                flugzeugGeschwindigkeit=0;
+                missionErfolgreich();
+            }
         }
+
 
         function aktualisierePanzerButton(){
             const hud=document.getElementById('hud');
