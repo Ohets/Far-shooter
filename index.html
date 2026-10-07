@@ -130,6 +130,107 @@
             osc.stop(audioCtx.currentTime + 0.12);
         }
 
+        // --- REGEN IN ALLEN MISSIONEN ---
+        const regenGruppe = new THREE.Group();
+        const regenTropfen = [];
+        let regenRauschquelle = null;
+        let regenRauschGain = null;
+
+        function erstelleRegen() {
+            while(regenGruppe.children.length) {
+                const o = regenGruppe.children.pop();
+                if(o.geometry) o.geometry.dispose();
+                if(o.material) o.material.dispose();
+            }
+            regenTropfen.length = 0;
+
+            const material = new THREE.LineBasicMaterial({
+                color: 0xbfdcff,
+                transparent: true,
+                opacity: 0.48
+            });
+
+            for(let i=0; i<750; i++) {
+                const tropfen = new THREE.Line(
+                    new THREE.BufferGeometry().setFromPoints([
+                        new THREE.Vector3(0,0,0),
+                        new THREE.Vector3(-0.10,-1.8,0)
+                    ]),
+                    material
+                );
+                tropfen.position.set(
+                    camera.position.x + (Math.random()-0.5)*70,
+                    4 + Math.random()*28,
+                    camera.position.z + (Math.random()-0.5)*70
+                );
+                tropfen.userData.fallSpeed = 18 + Math.random()*16;
+                regenGruppe.add(tropfen);
+                regenTropfen.push(tropfen);
+            }
+            scene.add(regenGruppe);
+        }
+
+        function starteRegengeraeusch() {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            if(regenRauschquelle) return;
+
+            const bufferSize = audioCtx.sampleRate * 2;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for(let i=0; i<bufferSize; i++) {
+                data[i] = (Math.random()*2-1) * 0.22;
+            }
+
+            regenRauschquelle = audioCtx.createBufferSource();
+            regenRauschquelle.buffer = buffer;
+            regenRauschquelle.loop = true;
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 2600;
+            filter.Q.value = 0.35;
+
+            regenRauschGain = audioCtx.createGain();
+            regenRauschGain.gain.value = 0.055;
+
+            regenRauschquelle.connect(filter);
+            filter.connect(regenRauschGain);
+            regenRauschGain.connect(audioCtx.destination);
+            regenRauschquelle.start();
+        }
+
+        function regengeraeuschBeiErsterAktion() {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            starteRegengeraeusch();
+        }
+
+        // Auf Mobilgeräten startet Audio erst nach einer Benutzeraktion.
+        document.addEventListener('pointerdown', regengeraeuschBeiErsterAktion, {once:true});
+        document.addEventListener('touchstart', regengeraeuschBeiErsterAktion, {once:true, passive:true});
+
+        function aktualisiereRegen(delta) {
+            for(const tropfen of regenTropfen) {
+                tropfen.position.y -= tropfen.userData.fallSpeed * delta;
+                tropfen.position.x += 0.8 * delta;
+
+                if(tropfen.position.y < 1) {
+                    tropfen.position.y = 25 + Math.random()*12;
+                    tropfen.position.x = camera.position.x + (Math.random()-0.5)*70;
+                    tropfen.position.z = camera.position.z + (Math.random()-0.5)*70;
+                }
+
+                if(Math.abs(tropfen.position.x-camera.position.x) > 40 ||
+                   Math.abs(tropfen.position.z-camera.position.z) > 40) {
+                    tropfen.position.x = camera.position.x + (Math.random()-0.5)*70;
+                    tropfen.position.z = camera.position.z + (Math.random()-0.5)*70;
+                    tropfen.position.y = 18 + Math.random()*18;
+                }
+            }
+        }
+
+        erstelleRegen();
+
+        // Regen und Regengeräusch bleiben bei jedem Missionswechsel aktiv.
         function playWinSound() {
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
@@ -1470,6 +1571,9 @@
         function animate() {
             requestAnimationFrame(animate);
             const delta = clock.getDelta();
+
+            // In jeder Mission fällt dauerhaft Regen.
+            aktualisiereRegen(delta);
 
             if(spieler.lastDamageTime > 0) {
                 spieler.lastDamageTime -= delta;
