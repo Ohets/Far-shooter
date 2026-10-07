@@ -383,6 +383,10 @@
         let szenerieGruppe = new THREE.Group();
         scene.add(szenerieGruppe);
 
+        // Panzer-Missionsdaten müssen vor dem ersten baueSzenerie(1)-Aufruf existieren.
+        let panzerObjekt = null;
+        let panzerPosition = new THREE.Vector3(55,0,-52);
+
         // Begehbare Gebäude: nur Wände blockieren den Spieler, die Türen bleiben offen.
         let weltKollisionsobjekte = [];
         // Rechteckige Innenbereiche der begehbaren Gebäude. Diese Zonen werden
@@ -1741,8 +1745,6 @@
         let aktuellesZiel = null;
         let zielZeit = 0;
         let zielZone = null;
-        let panzerObjekt = null;
-        let panzerPosition = new THREE.Vector3(55,0,-52);
         let missionAbgeschlossen = false;
 
         function erstelleSoldat() {
