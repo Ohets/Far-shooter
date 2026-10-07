@@ -397,6 +397,9 @@
         let panzerTurm = null;
         let panzerLauf = null;
         let panzerFeuerCooldown = 0;
+        let panzerZerstoerbareObjekte = [];
+        let panzerGebietOffen = false;
+        let geheimesFlugzeug = null;
 
         // Begehbare Gebäude: nur Wände blockieren den Spieler, die Türen bleiben offen.
         let weltKollisionsobjekte = [];
@@ -1309,7 +1312,7 @@
 
         function bauePanzerMission(){
             if(panzerObjekt){ scene.remove(panzerObjekt); panzerObjekt=null; }
-            panzerFahrbar = spieler.mission === 2;
+            panzerFahrbar = spieler.mission === 2 || spieler.mission === 3;
             spielerImPanzer = false;
             panzerTurm = null;
             panzerLauf = null;
@@ -1419,6 +1422,104 @@
             }
         }
 
+        function baueMission3PanzerGebiet(){
+            panzerZerstoerbareObjekte=[];
+            panzerGebietOffen=false;
+            geheimesFlugzeug=null;
+
+            const cx=85, cz=-85, half=32, wallH=6, wallT=1.1;
+            const wallMat=new THREE.MeshLambertMaterial({color:0x4b5558});
+            const makeWall=(x,y,z,w,h,d,type,hp)=>{
+                const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),wallMat.clone());
+                o.position.set(x,y,z);
+                o.castShadow=true; o.receiveShadow=true;
+                o.userData.zielTyp=type;
+                o.userData.hp=hp; o.userData.maxHp=hp; o.userData.zerstoert=false;
+                szenerieGruppe.add(o);
+                panzerZerstoerbareObjekte.push(o);
+                weltKollisionsobjekte.push(o);
+                return o;
+            };
+
+            // Durchgehende, segmentierte Außenmauer.
+            for(let i=0;i<8;i++){
+                const off=-28+i*8;
+                makeWall(cx+off,wallH/2,cz-half,8.1,wallH,wallT,'sperrmauer',420);
+                makeWall(cx+off,wallH/2,cz+half,8.1,wallH,wallT,'sperrmauer',420);
+                makeWall(cx-half,wallH/2,cz+off,wallT,wallH,8.1,'sperrmauer',420);
+                makeWall(cx+half,wallH/2,cz+off,wallT,wallH,8.1,'sperrmauer',420);
+            }
+
+            // Gepanzerter Hangar im Inneren.
+            const hw=24, hd=20, hh=9;
+            const hangar=new THREE.Group();
+            hangar.position.set(cx,0,cz);
+            const hangarMat=new THREE.MeshLambertMaterial({color:0x30383c});
+            const floor=new THREE.Mesh(new THREE.BoxGeometry(hw,0.25,hd),new THREE.MeshLambertMaterial({color:0x25292b}));
+            floor.position.y=0.13; hangar.add(floor);
+
+            const left=new THREE.Mesh(new THREE.BoxGeometry(0.8,hh,hd),hangarMat);
+            left.position.set(-hw/2,hh/2,0);
+            const right=left.clone(); right.position.x=hw/2;
+            const back=new THREE.Mesh(new THREE.BoxGeometry(hw,hh,0.8),hangarMat);
+            back.position.set(0,hh/2,-hd/2);
+            hangar.add(left,right,back);
+            [left,right,back].forEach(o=>{
+                o.castShadow=true; o.receiveShadow=true;
+                weltKollisionsobjekte.push(o);
+            });
+
+            const plateMat=new THREE.MeshLambertMaterial({color:0x596368});
+            const pw=(hw-1.2)/6;
+            for(let i=0;i<6;i++){
+                const plate=new THREE.Mesh(new THREE.BoxGeometry(pw,hh,0.75),plateMat.clone());
+                plate.position.set(-hw/2+0.6+pw*(i+0.5),hh/2,hd/2);
+                plate.castShadow=true; plate.receiveShadow=true;
+                plate.userData.zielTyp='flugzeugPanzerplatte';
+                plate.userData.hp=300; plate.userData.maxHp=300; plate.userData.zerstoert=false;
+                hangar.add(plate);
+                panzerZerstoerbareObjekte.push(plate);
+                weltKollisionsobjekte.push(plate);
+            }
+
+            const roof=new THREE.Mesh(new THREE.BoxGeometry(hw+1,0.6,hd+1),new THREE.MeshLambertMaterial({color:0x202629}));
+            roof.position.y=hh+0.3; hangar.add(roof);
+
+            // Das Flugzeug wird erst nach dem Entfernen aller Panzerplatten sichtbar.
+            const aircraft=new THREE.Group();
+            const fuselage=new THREE.Mesh(new THREE.CylinderGeometry(1.15,1.15,12,12),new THREE.MeshLambertMaterial({color:0x747a7d}));
+            fuselage.rotation.z=Math.PI/2;
+            const nose=new THREE.Mesh(new THREE.ConeGeometry(1.15,2.5,12),new THREE.MeshLambertMaterial({color:0x8a9093}));
+            nose.rotation.z=-Math.PI/2; nose.position.x=7.1;
+            const wing=new THREE.Mesh(new THREE.BoxGeometry(3.8,0.18,13),new THREE.MeshLambertMaterial({color:0x424a4d}));
+            const tail=new THREE.Mesh(new THREE.BoxGeometry(2.4,2.0,0.18),new THREE.MeshLambertMaterial({color:0x3d4548}));
+            tail.position.x=-5.2;
+            aircraft.add(fuselage,nose,wing,tail);
+            aircraft.position.set(cx,2.0,cz);
+            aircraft.rotation.y=Math.PI/2;
+            aircraft.visible=false;
+            szenerieGruppe.add(aircraft);
+            geheimesFlugzeug=aircraft;
+
+            const ring=new THREE.Mesh(new THREE.RingGeometry(3.5,4.3,32),new THREE.MeshBasicMaterial({color:0x00ff88,side:THREE.DoubleSide,transparent:true,opacity:0.7}));
+            ring.rotation.x=-Math.PI/2;
+            ring.position.set(cx,0.08,cz);
+            ring.visible=false;
+            szenerieGruppe.add(ring);
+            ring.userData.missionMarker=true;
+
+            const canvas=document.createElement('canvas');
+            canvas.width=512; canvas.height=96;
+            const ctx=canvas.getContext('2d');
+            ctx.fillStyle='rgba(0,0,0,0.82)'; ctx.fillRect(0,0,512,96);
+            ctx.fillStyle='#fff'; ctx.font='bold 34px sans-serif'; ctx.textAlign='center';
+            ctx.fillText('GEHEIMES FLUGZEUG',256,58);
+            const label=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),transparent:true,depthTest:false}));
+            label.scale.set(8,1.5,1); label.position.set(cx,6.5,cz); label.visible=false;
+            szenerieGruppe.add(label);
+            ring.userData.label=label;
+        }
+
         function aktualisierePanzerButton(){
             const hud=document.getElementById('hud');
             if(hud) hud.dataset.tankMode=spielerImPanzer ? '1' : '0';
@@ -1426,7 +1527,7 @@
             const scope=document.getElementById('tank-scope');
             if(scope) scope.style.display=spielerImPanzer ? 'block' : 'none';
             if(!btn) return;
-            if(spieler.mission!==2 || !panzerObjekt){
+            if((spieler.mission!==2 && spieler.mission!==3) || !panzerObjekt){
                 btn.style.display='none';
                 return;
             }
@@ -1443,7 +1544,7 @@
         }
 
         function togglePanzerEinsteigen(){
-            if(spieler.mission!==2 || !panzerObjekt) return;
+            if((spieler.mission!==2 && spieler.mission!==3) || !panzerObjekt) return;
             if(spielerImPanzer){
                 spielerImPanzer=false;
                 camera.position.set(
@@ -1462,7 +1563,7 @@
         }
 
         function aktualisierePanzer(delta){
-            if(!panzerObjekt || spieler.mission!==2) return;
+            if(!panzerObjekt || (spieler.mission!==2 && spieler.mission!==3)) return;
 
             if(spielerImPanzer){
                 const steuerung=moveInput.y;
@@ -1474,7 +1575,17 @@
                         0,
                         Math.cos(panzerObjekt.rotation.y)
                     ).multiplyScalar(-steuerung * delta * 7.0);
-                    panzerObjekt.position.add(vorwaerts);
+                    const neuePos=panzerObjekt.position.clone().add(vorwaerts);
+                    let darfFahren=true;
+                    if(spieler.mission===3){
+                        for(const sperre of panzerZerstoerbareObjekte){
+                            if(!sperre || sperre.userData.zielTyp!=='sperrmauer' || sperre.userData.zerstoert) continue;
+                            const box=new THREE.Box3().setFromObject(sperre);
+                            box.expandByScalar(3.0);
+                            if(box.containsPoint(neuePos)){ darfFahren=false; break; }
+                        }
+                    }
+                    if(darfFahren) panzerObjekt.position.copy(neuePos);
                     panzerObjekt.position.x=Math.max(-118,Math.min(118,panzerObjekt.position.x));
                     panzerObjekt.position.z=Math.max(-118,Math.min(118,panzerObjekt.position.z));
                 }
@@ -1580,7 +1691,8 @@
                 }
             }
 
-            if(missionsNummer===1 || missionsNummer===2) bauePanzerMission();
+            if(missionsNummer===1 || missionsNummer===2 || missionsNummer===3) bauePanzerMission();
+            if(missionsNummer===3) baueMission3PanzerGebiet();
             if(daten.objekt === "geisel") baueGeiselSzenerie();
             if(daten.objekt === "verbuendete") baueVerbuendetenSzenerie();
 
@@ -2183,7 +2295,10 @@
                 const raycaster=new THREE.Raycaster();
                 raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
                 const gegnerMeshes=gegnerArray.filter(g=>g && !g.dying).map(g=>g.mesh);
-                const intersects=raycaster.intersectObjects(gegnerMeshes,true);
+                const zielObjekte=spieler.mission===3
+                    ? gegnerMeshes.concat(panzerZerstoerbareObjekte.filter(o=>o && o.parent && !o.userData.zerstoert))
+                    : gegnerMeshes;
+                const intersects=raycaster.intersectObjects(zielObjekte,true);
 
                 let explosionsPunkt=null;
                 if(intersects.length>0){
@@ -2195,6 +2310,24 @@
                 }
 
                 const explosionsRadius=11.5;
+
+                if(spieler.mission===3){
+                    for(const objekt of panzerZerstoerbareObjekte.slice()){
+                        if(!objekt || !objekt.parent || objekt.userData.zerstoert || objekt.userData.missionMarker) continue;
+                        const distanz=objekt.position.distanceTo(explosionsPunkt);
+                        if(distanz<=explosionsRadius){
+                            const falloff=1-Math.min(distanz/explosionsRadius,1);
+                            objekt.userData.hp-=Math.round(110+190*falloff);
+                            if(objekt.material && objekt.material.color) objekt.material.color.setHex(0x747d80);
+                            if(objekt.userData.hp<=0){
+                                objekt.userData.zerstoert=true;
+                                weltKollisionsobjekte=weltKollisionsobjekte.filter(w=>w!==objekt);
+                                szenerieGruppe.remove(objekt);
+                            }
+                        }
+                    }
+                }
+
                 for(const g of gegnerArray){
                     if(!g || g.dying || !g.mesh) continue;
                     const zielPunkt=g.mesh.position.clone();
@@ -2281,6 +2414,8 @@
                 aktuellesZiel={typ:"panzer",name:"Suche den Panzer – stark bewacht!"};
             } else if(spieler.mission===2) {
                 aktuellesZiel={typ:"panzer_fahrt",name:"Bringe den Panzer sicher nach draußen in unser Versteck"};
+            } else if(spieler.mission===3) {
+                aktuellesZiel={typ:"flugzeug",name:"Mit dem Panzer die Sperrmauer durchbrechen"};
             } else if(spieler.mission===11) {
                 aktuellesZiel={typ:"geisel",name:"Rette die Geisel – kein Alarm!"};
             } else if(spieler.mission===12) {
@@ -2364,6 +2499,10 @@
                 const d=camera.position.distanceTo(panzerPosition);
                 if(d<7.5) missionErfolgreich();
             }
+            if(aktuellesZiel.typ === "flugzeug" && geheimesFlugzeug && geheimesFlugzeug.visible) {
+                if(camera.position.distanceTo(geheimesFlugzeug.position)<8 && !missionAbgeschlossen) missionErfolgreich();
+            }
+
             if(aktuellesZiel.typ === "panzer_fahrt" && panzerObjekt) {
                 const d=panzerObjekt.position.distanceTo(panzerZielPosition);
                 if(d<7.5 && !missionAbgeschlossen) {
@@ -2391,7 +2530,7 @@
             camera.position.set(0, 2, 0);
             rotationX = 0;
             rotationY = 0;
-            if(spieler.mission===2){
+            if(spieler.mission===2 || spieler.mission===3){
                 camera.position.set(panzerPosition.x-6,2,panzerPosition.z+3);
                 rotationY=Math.atan2(panzerPosition.x-camera.position.x,panzerPosition.z-camera.position.z);
             }
@@ -2399,7 +2538,7 @@
                 scene.remove(zielZone);
                 zielZone = null;
             }
-            const gegnerAnzahl=(spieler.mission===11 || spieler.mission===2) ? 0 : Math.min(18,3+spieler.mission+Math.floor(spieler.mission/3));
+            const gegnerAnzahl=(spieler.mission===11 || spieler.mission===2 || spieler.mission===3) ? 0 : Math.min(18,3+spieler.mission+Math.floor(spieler.mission/3));
             erstelleGegner(gegnerAnzahl);
             if(spieler.mission===11){
                 [[24,-40],[32,-40],[40,-40],[21,-30],[43,-30],[24,-20],[32,-20],[40,-20],[27,-25],[37,-25]]
@@ -3077,6 +3216,26 @@
                     }
                 }
             });
+
+            if(spieler.mission===3){
+                panzerZerstoerbareObjekte=panzerZerstoerbareObjekte.filter(o=>o && (o.parent || o.userData.zerstoert));
+                const mauerRest=panzerZerstoerbareObjekte.some(o=>o.userData.zielTyp==='sperrmauer' && !o.userData.zerstoert);
+                const plattenRest=panzerZerstoerbareObjekte.some(o=>o.userData.zielTyp==='flugzeugPanzerplatte' && !o.userData.zerstoert);
+                if(!mauerRest) panzerGebietOffen=true;
+                if(aktuellesZiel && aktuellesZiel.typ==='flugzeug'){
+                    if(mauerRest) aktuellesZiel.name='Mit dem Panzer die Sperrmauer durchbrechen';
+                    else if(plattenRest) aktuellesZiel.name='Zerschieße die Panzerplatten des Hangars';
+                    else aktuellesZiel.name='Finde das geheime Flugzeug im Hangar';
+                }
+                if(!plattenRest && geheimesFlugzeug){
+                    geheimesFlugzeug.visible=true;
+                    const ring=szenerieGruppe.children.find(o=>o.userData && o.userData.missionMarker);
+                    if(ring){
+                        ring.visible=true;
+                        if(ring.userData.label) ring.userData.label.visible=true;
+                    }
+                }
+            }
 
             // Mission 12: Verbündete werden fortlaufend aktualisiert.
             if(spieler.mission===12) updateVerbuendete(delta);
