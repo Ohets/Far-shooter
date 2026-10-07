@@ -1741,15 +1741,11 @@
 
         const planeBtnElement=document.getElementById('plane-btn');
         if(planeBtnElement){
-            planeBtnElement.addEventListener('pointerdown',(e)=>{
+            planeBtnElement.addEventListener('click',(e)=>{
                 e.preventDefault();
                 e.stopPropagation();
                 toggleFlugzeugEinsteigen();
             });
-            planeBtnElement.addEventListener('touchstart',(e)=>{
-                e.preventDefault();
-                e.stopPropagation();
-            },{passive:false});
         }
 
         function toggleFlugzeugEinsteigen(){
