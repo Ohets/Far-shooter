@@ -1292,6 +1292,87 @@
             });
         }
 
+        function bauePanzerMission(){
+            if(panzerObjekt){ scene.remove(panzerObjekt); panzerObjekt=null; }
+
+            const tank=new THREE.Group();
+            const hullMat=new THREE.MeshLambertMaterial({color:0x3b4630});
+            const darkMat=new THREE.MeshLambertMaterial({color:0x20251f});
+            const metalMat=new THREE.MeshLambertMaterial({color:0x555a4b});
+
+            const hull=new THREE.Mesh(new THREE.BoxGeometry(4.8,1.25,7.2),hullMat);
+            hull.position.y=1.15;
+            hull.castShadow=true;
+            hull.receiveShadow=true;
+            tank.add(hull);
+
+            const upper=new THREE.Mesh(new THREE.BoxGeometry(3.5,0.9,4.2),hullMat);
+            upper.position.set(0,2.05,0.25);
+            upper.castShadow=true;
+            tank.add(upper);
+
+            const turret=new THREE.Mesh(new THREE.CylinderGeometry(1.35,1.55,0.75,10),darkMat);
+            turret.position.set(0,2.72,-0.1);
+            turret.rotation.x=Math.PI/2;
+            turret.castShadow=true;
+            tank.add(turret);
+
+            const barrel=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.28,5.2,10),metalMat);
+            barrel.rotation.x=Math.PI/2;
+            barrel.position.set(0,2.72,-2.55);
+            barrel.castShadow=true;
+            tank.add(barrel);
+
+            [-2.15,2.15].forEach(x=>{
+                [-2.45,0,2.45].forEach(z=>{
+                    const wheel=new THREE.Mesh(new THREE.CylinderGeometry(0.62,0.62,0.42,12),darkMat);
+                    wheel.rotation.z=Math.PI/2;
+                    wheel.position.set(x,0.7,z);
+                    wheel.castShadow=true;
+                    tank.add(wheel);
+                });
+            });
+
+            const antenna=new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,2.5,6),metalMat);
+            antenna.position.set(1.25,3.9,0.5);
+            tank.add(antenna);
+
+            const beacon=new THREE.Mesh(new THREE.SphereGeometry(0.14,8,8),new THREE.MeshBasicMaterial({color:0xff3333}));
+            beacon.position.set(0,3.05,0.25);
+            tank.add(beacon);
+
+            tank.position.copy(panzerPosition);
+            tank.rotation.y=Math.PI*0.12;
+            szenerieGruppe.add(tank);
+            panzerObjekt=tank;
+
+            // Sandsäcke und Kisten bilden einen kleinen, stark gesicherten Kontrollpunkt.
+            [[-8,-5],[-8,5],[8,-5],[8,5],[-5,-9],[5,-9],[-5,9],[5,9]].forEach(p=>{
+                const sack=new THREE.Mesh(
+                    new THREE.BoxGeometry(2.1,0.75,0.85),
+                    new THREE.MeshLambertMaterial({color:0x756c58})
+                );
+                sack.position.set(panzerPosition.x+p[0],0.42,panzerPosition.z+p[1]);
+                sack.rotation.y=p[0]*0.08;
+                sack.castShadow=true;
+                szenerieGruppe.add(sack);
+            });
+
+            for(let i=0;i<5;i++){
+                const crate=new THREE.Mesh(
+                    new THREE.BoxGeometry(1.5,1.1,1.5),
+                    new THREE.MeshLambertMaterial({color:0x5b4630})
+                );
+                crate.position.set(panzerPosition.x-7+i*3.5,0.55,panzerPosition.z+11);
+                crate.castShadow=true;
+                szenerieGruppe.add(crate);
+            }
+
+            const light=new THREE.PointLight(0xff5533,1.6,18);
+            light.position.set(panzerPosition.x,4.5,panzerPosition.z);
+            szenerieGruppe.add(light);
+        }
+
         function baueSzenerie(missionsNummer) {
             // Beim Wechsel der Mission alte Etagen-Bodeninformationen entfernen.
             hochhausEtagenBoeden = [];
@@ -1355,6 +1436,7 @@
                 }
             }
 
+            if(missionsNummer===1) bauePanzerMission();
             if(daten.objekt === "geisel") baueGeiselSzenerie();
             if(daten.objekt === "verbuendete") baueVerbuendetenSzenerie();
 
@@ -1659,6 +1741,8 @@
         let aktuellesZiel = null;
         let zielZeit = 0;
         let zielZone = null;
+        let panzerObjekt = null;
+        let panzerPosition = new THREE.Vector3(55,0,-52);
         let missionAbgeschlossen = false;
 
         function erstelleSoldat() {
@@ -1944,7 +2028,9 @@
                 zielZone = null;
             }
 
-            if(spieler.mission===11) {
+            if(spieler.mission===1) {
+                aktuellesZiel={typ:"panzer",name:"Suche den Panzer – stark bewacht!"};
+            } else if(spieler.mission===11) {
                 aktuellesZiel={typ:"geisel",name:"Rette die Geisel – kein Alarm!"};
             } else if(spieler.mission===12) {
                 aktuellesZiel={typ:"verbuendete",name:"Gemeinsam vorrücken – eliminiert alle Gegner"};
@@ -2023,10 +2109,15 @@
                 const d=camera.position.distanceTo(geiselZone.position);
                 if(d<4.0) missionErfolgreich();
             }
+            if(aktuellesZiel.typ === "panzer" && panzerObjekt) {
+                const d=camera.position.distanceTo(panzerPosition);
+                if(d<7.5) missionErfolgreich();
+            }
         }
 
         function starteMission() {
             if(geiselObjekt){scene.remove(geiselObjekt);geiselObjekt=null;}
+            if(panzerObjekt){scene.remove(panzerObjekt);panzerObjekt=null;}
             if(geiselZone){scene.remove(geiselZone);geiselZone=null;}
             verbuendeteArray.forEach(a=>scene.remove(a.mesh));
             verbuendeteArray=[];
@@ -2047,7 +2138,47 @@
             if(spieler.mission===11){
                 [[24,-40],[32,-40],[40,-40],[21,-30],[43,-30],[24,-20],[32,-20],[40,-20],[27,-25],[37,-25]]
                 .forEach((p,i)=>fuegeGeiselWacheHinzu(p[0],p[1],i));
+            }\n            if(spieler.mission===1){
+                // Der Panzer wird von einem großen Sicherungsring aus Bodentruppen bewacht.
+                const wachen=[
+                    [-10,-4],[-7,-8],[0,-10],[7,-8],[10,-4],
+                    [-11,4],[-7,9],[0,11],[7,9],[11,4],
+                    [-4,-13],[4,-13]
+                ];
+                wachen.forEach((p,i)=>{
+                    const mesh=erstelleSoldat();
+                    mesh.position.set(panzerPosition.x+p[0],0,panzerPosition.z+p[1]);
+                    scene.add(mesh);
+                    const verhalten=(i%5===0) ? "scharfschuetze" : "verteidiger";
+                    const hp=135+spieler.mission*32;
+                    gegnerArray.push({
+                        mesh,
+                        material:mesh.userData.parts.uniformMat,
+                        hp,maxHp:hp,
+                        flashTimer:0,
+                        attackCooldown:0.5+Math.random(),
+                        animTime:Math.random()*10,
+                        walkPhase:Math.random()*Math.PI*2,
+                        dying:false,
+                        deathTime:0,
+                        muzzleTime:0,
+                        shotCooldown:0.8+Math.random()*1.4,
+                        verhalten,
+                        spawnPosition:mesh.position.clone(),
+                        strafeDir:i%2?1:-1,
+                        strafeTimer:1+Math.random()*2,
+                        lastPlayerShot:0,
+                        shootAnimTime:0,
+                        shootRecoil:0,
+                        entdeckt:false,
+                        entdeckungsZeit:0,
+                        schutzpunkt:panzerPosition.clone(),
+                        festerPosten:false
+                    });
+                });
             }
+
+
             if(spieler.mission===12) starteVerbuendete();
 
             // Stationäre Scharfschützen auf den Wachtürmen.
@@ -2109,6 +2240,8 @@
                     document.getElementById('objective-text').innerText = aktuellesZiel.name + " " + rest + "s";
                 } else if(aktuellesZiel.typ === "eliminieren") {
                     document.getElementById('objective-text').innerText = aktuellesZiel.name + " (" + gegnerArray.length + " übrig)";
+                } else if(aktuellesZiel.typ === "panzer") {
+                    document.getElementById('objective-text').innerText = aktuellesZiel.name;
                 } else {
                     document.getElementById('objective-text').innerText = aktuellesZiel.name;
                 }
