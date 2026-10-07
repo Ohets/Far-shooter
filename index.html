@@ -20,6 +20,8 @@
         #look-stick { right: 40px; width: 100px; height: 100px; }
         #jump-btn { position: absolute; bottom: 245px; right: 55px; width: 64px; height: 64px; background: rgba(40,150,255,0.65); border-radius: 50%; display:flex; align-items:center; justify-content:center; font-size:14px; pointer-events:auto; z-index:4; }
         #fire-btn { position: absolute; bottom: 160px; right: 50px; width: 70px; height: 70px; background: rgba(255, 0, 0, 0.6); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; pointer-events: auto; }
+        #tank-scope { display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:170px; height:170px; border:2px solid rgba(255,255,255,.72); border-radius:50%; pointer-events:none; z-index:5; box-shadow:0 0 0 9999px rgba(0,0,0,.06); }
+        #hud[data-tank-mode="1"] + #tank-scope { display:block; }
         #tank-btn { display:none; position:absolute; bottom:245px; left:50%; transform:translateX(-50%); padding:12px 18px; background:rgba(70,105,55,0.94); border:2px solid #b7d77a; color:white; border-radius:8px; font-weight:bold; font-size:15px; pointer-events:auto; z-index:6; }
         #aim-btn { position: absolute; bottom: 160px; right: 135px; width: 64px; height: 64px; background: rgba(60,60,60,0.78); border: 2px solid rgba(255,255,255,0.65); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; pointer-events: auto; touch-action: none; z-index: 4; }
         #aim-btn.aktiv { background: rgba(40,140,255,0.9); border-color: #8fd3ff; }
@@ -65,6 +67,7 @@
     <div id="aim-btn">ZIELEN</div>
     <div id="fire-btn" class="ui-element">FEUER</div>
     <div id="tank-btn">PANZER EINSTEIGEN</div>
+    <div id="tank-scope">ZIELROHR</div>
     <div id="level-btn">LEVEL</div>
     <div id="shop-btn">WAFFEN-SHOP</div>
 
@@ -1311,12 +1314,9 @@
             panzerTurm = null;
             panzerLauf = null;
             panzerFeuerCooldown = 0;
-            if(spieler.mission === 2) {
-                panzerPosition.set(15,0,-25);
-                panzerZielPosition.set(82,0,-82);
-            } else {
-                panzerPosition.set(55,0,-52);
-            }
+            // Der Panzer steht in Level 2 exakt an derselben Stelle wie in Level 1.
+            panzerPosition.set(55,0,-52);
+            panzerZielPosition.set(82,0,-82);
 
             const tank=new THREE.Group();
             const hullMat=new THREE.MeshLambertMaterial({color:0x3b4630});
@@ -1420,7 +1420,11 @@
         }
 
         function aktualisierePanzerButton(){
+            const hud=document.getElementById('hud');
+            if(hud) hud.dataset.tankMode=spielerImPanzer ? '1' : '0';
             const btn=document.getElementById('tank-btn');
+            const scope=document.getElementById('tank-scope');
+            if(scope) scope.style.display=spielerImPanzer ? 'block' : 'none';
             if(!btn) return;
             if(spieler.mission!==2 || !panzerObjekt){
                 btn.style.display='none';
@@ -1475,14 +1479,25 @@
                     panzerObjekt.position.z=Math.max(-118,Math.min(118,panzerObjekt.position.z));
                 }
 
-                rotationY=panzerObjekt.rotation.y + lookInput.x*0.02;
-                if(panzerTurm) panzerTurm.rotation.y = lookInput.x*0.02;
-                if(panzerLauf) panzerLauf.rotation.x=Math.PI/2;
+                // Das Zielfernrohr kann unabhängig vom Panzer mit dem rechten Joystick
+                // nach links/rechts und oben/unten verstellt werden.
+                rotationY=panzerObjekt.rotation.y + lookInput.x*0.025;
+                rotationX=Math.max(-0.42,Math.min(0.28,rotationX + lookInput.y*0.012));
+                if(panzerTurm) panzerTurm.rotation.y = rotationY-panzerObjekt.rotation.y;
+                if(panzerLauf) {
+                    panzerLauf.rotation.x=Math.PI/2 + rotationX*0.65;
+                }
 
-                const sitzOffset=new THREE.Vector3(0,3.35,1.0);
+                // Außensicht: Kamera sitzt hinter/über dem Panzer und folgt ihm.
+                const sitzOffset=new THREE.Vector3(0,4.4,7.2);
                 sitzOffset.applyAxisAngle(new THREE.Vector3(0,1,0),panzerObjekt.rotation.y);
                 camera.position.copy(panzerObjekt.position).add(sitzOffset);
-                camera.position.y=3.35;
+                camera.position.y=4.4;
+                camera.lookAt(
+                    panzerObjekt.position.x,
+                    panzerObjekt.position.y+1.5,
+                    panzerObjekt.position.z
+                );
             }
 
             if(panzerObjekt.userData.hitFlash>0){
@@ -1492,6 +1507,7 @@
             panzerFeuerCooldown=Math.max(0,panzerFeuerCooldown-delta);
             if(spielerImPanzer && panzerTurm){
                 panzerTurm.rotation.y = rotationY-panzerObjekt.rotation.y;
+                if(panzerLauf) panzerLauf.rotation.x=Math.PI/2 + rotationX*0.65;
             }
         }
 
@@ -2288,6 +2304,10 @@
             camera.position.set(0, 2, 0);
             rotationX = 0;
             rotationY = 0;
+            if(spieler.mission===2){
+                camera.position.set(panzerPosition.x-6,2,panzerPosition.z+3);
+                rotationY=Math.atan2(panzerPosition.x-camera.position.x,panzerPosition.z-camera.position.z);
+            }
             if(zielZone) {
                 scene.remove(zielZone);
                 zielZone = null;
@@ -2298,18 +2318,13 @@
                 [[24,-40],[32,-40],[40,-40],[21,-30],[43,-30],[24,-20],[32,-20],[40,-20],[27,-25],[37,-25]]
                 .forEach((p,i)=>fuegeGeiselWacheHinzu(p[0],p[1],i));
             }
-            if(spieler.mission===1 || spieler.mission===2){
-                // Der Panzer wird von einem großen Sicherungsring aus Bodentruppen bewacht.
-                const wachen=[
+            if(spieler.mission===1){
+                // Level 1: großer Sicherungsring direkt um den Panzer.
+                const aktiveWachen=[
                     [-10,-4],[-7,-8],[0,-10],[7,-8],[10,-4],
                     [-11,4],[-7,9],[0,11],[7,9],[11,4],
                     [-4,-13],[4,-13]
                 ];
-                const mission2Wachen = [
-                    [-10,-6],[-6,-10],[0,-12],[7,-9],[11,-4],
-                    [-11,4],[-8,9],[0,11],[8,8],[12,3]
-                ];
-                const aktiveWachen = spieler.mission===2 ? mission2Wachen : wachen;
                 aktiveWachen.forEach((p,i)=>{
                     const mesh=erstelleSoldat();
                     mesh.position.set(panzerPosition.x+p[0],0,panzerPosition.z+p[1]);
@@ -2343,6 +2358,40 @@
                 });
             }
 
+            if(spieler.mission===2){
+                // Level 2: die Eskorte steht wirklich direkt beim Panzer.
+                const wachen2=[
+                    [-7,-3],[-5,4],[0,-7],[6,-5],[8,2],
+                    [-8,2],[-4,7],[3,8],[8,6]
+                ];
+                wachen2.forEach((p,i)=>{
+                    const mesh=erstelleSoldat();
+                    mesh.position.set(panzerPosition.x+p[0],0,panzerPosition.z+p[1]);
+                    mesh.rotation.y=Math.atan2(panzerPosition.x-mesh.position.x,panzerPosition.z-mesh.position.z);
+                    scene.add(mesh);
+                    const verhalten=(i%4===0) ? "scharfschuetze" : "verteidiger";
+                    const hp=135+spieler.mission*32;
+                    gegnerArray.push({
+                        mesh,
+                        material:mesh.userData.parts.uniformMat,
+                        hp,maxHp:hp,
+                        flashTimer:0,
+                        attackCooldown:0.5+Math.random(),
+                        animTime:Math.random()*10,
+                        walkPhase:Math.random()*Math.PI*2,
+                        dying:false, deathTime:0, muzzleTime:0,
+                        shotCooldown:0.8+Math.random()*1.4,
+                        verhalten,
+                        spawnPosition:mesh.position.clone(),
+                        strafeDir:i%2?1:-1,
+                        strafeTimer:1+Math.random()*2,
+                        lastPlayerShot:0, shootAnimTime:0, shootRecoil:0,
+                        entdeckt:false, entdeckungsZeit:0,
+                        schutzpunkt:panzerPosition.clone(),
+                        festerPosten:false
+                    });
+                });
+            }
 
             if(spieler.mission===12) starteVerbuendete();
 
