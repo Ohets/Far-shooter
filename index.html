@@ -2076,6 +2076,8 @@
                     g.mesh.rotation.y = Math.atan2(lookDir.x, lookDir.z);
                 }
 
+                } // Ende des festen-Posten-else-Blocks
+
                 // Waffenhaltung: nah = Anschlag, sonst normale Laufhaltung
                 const schussReichweite = g.festerPosten ? 58 : (g.verhalten === "scharfschuetze" ? 42 :
                                          g.verhalten === "verteidiger" ? 30 : 24);
