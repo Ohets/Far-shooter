@@ -1658,7 +1658,13 @@
                 const k=weltKollisionsobjekte.indexOf(o);
                 if(k>=0) weltKollisionsobjekte.splice(k,1);
             });
-            if(hangar && hangar.parent) hangar.parent.remove(hangar);
+            if(hangar){
+                hangar.traverse(o=>{
+                    const k=weltKollisionsobjekte.indexOf(o);
+                    if(k>=0) weltKollisionsobjekte.splice(k,1);
+                });
+                if(hangar.parent) hangar.parent.remove(hangar);
+            }
             panzerZerstoerbareObjekte=[];
             if(geheimesFlugzeug){
                 geheimesFlugzeug.visible=true;
@@ -1666,7 +1672,10 @@
                 geheimesFlugzeug.rotation.set(0,Math.PI/2,0);
                 flugzeugObjekt=geheimesFlugzeug;
             }
-            szenerieGruppe.traverse(o=>{ if(o.userData && o.userData.missionMarker) o.visible=false; });
+            szenerieGruppe.traverse(o=>{
+                if(o.userData && o.userData.missionMarker) o.visible=false;
+                if(o.isSprite && Math.abs(o.position.x-85)<1 && Math.abs(o.position.z+85)<1) o.visible=false;
+            });
 
             const runway=new THREE.Mesh(new THREE.PlaneGeometry(18,210),new THREE.MeshLambertMaterial({color:0x25282a}));
             runway.rotation.x=-Math.PI/2; runway.position.set(85,0.03,-5); runway.receiveShadow=true; szenerieGruppe.add(runway);
