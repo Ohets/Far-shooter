@@ -2314,7 +2314,9 @@
                 if(spieler.mission===3){
                     for(const objekt of panzerZerstoerbareObjekte.slice()){
                         if(!objekt || !objekt.parent || objekt.userData.zerstoert || objekt.userData.missionMarker) continue;
-                        const distanz=objekt.position.distanceTo(explosionsPunkt);
+                        const objektWeltPosition=new THREE.Vector3();
+                        objekt.getWorldPosition(objektWeltPosition);
+                        const distanz=objektWeltPosition.distanceTo(explosionsPunkt);
                         if(distanz<=explosionsRadius){
                             const falloff=1-Math.min(distanz/explosionsRadius,1);
                             objekt.userData.hp-=Math.round(110+190*falloff);
