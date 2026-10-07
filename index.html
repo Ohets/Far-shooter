@@ -1451,7 +1451,7 @@
             }
 
             // Gepanzerter Hangar im Inneren.
-            const hw=24, hd=20, hh=9;
+            const hw=46, hd=34, hh=14;
             const hangar=new THREE.Group();
             hangar.position.set(cx,0,cz);
             const hangarMat=new THREE.MeshLambertMaterial({color:0x30383c});
@@ -1485,18 +1485,76 @@
             const roof=new THREE.Mesh(new THREE.BoxGeometry(hw+1,0.6,hd+1),new THREE.MeshLambertMaterial({color:0x202629}));
             roof.position.y=hh+0.3; hangar.add(roof);
 
-            // Das Flugzeug wird erst nach dem Entfernen aller Panzerplatten sichtbar.
+            // Großes modernes Geheimflugzeug mit aggressiver Jet-Silhouette.
             const aircraft=new THREE.Group();
-            const fuselage=new THREE.Mesh(new THREE.CylinderGeometry(1.15,1.15,12,12),new THREE.MeshLambertMaterial({color:0x747a7d}));
-            fuselage.rotation.z=Math.PI/2;
-            const nose=new THREE.Mesh(new THREE.ConeGeometry(1.15,2.5,12),new THREE.MeshLambertMaterial({color:0x8a9093}));
-            nose.rotation.z=-Math.PI/2; nose.position.x=7.1;
-            const wing=new THREE.Mesh(new THREE.BoxGeometry(3.8,0.18,13),new THREE.MeshLambertMaterial({color:0x424a4d}));
-            const tail=new THREE.Mesh(new THREE.BoxGeometry(2.4,2.0,0.18),new THREE.MeshLambertMaterial({color:0x3d4548}));
-            tail.position.x=-5.2;
-            aircraft.add(fuselage,nose,wing,tail);
-            aircraft.position.set(cx,2.0,cz);
+            const bodyMat=new THREE.MeshLambertMaterial({color:0x3f464a});
+            const darkMat=new THREE.MeshLambertMaterial({color:0x1e2529});
+            const cockpitMat=new THREE.MeshPhongMaterial({color:0x172b3b,transparent:true,opacity:0.82,shininess:110});
+
+            const body=new THREE.Mesh(new THREE.CylinderGeometry(1.15,1.35,13.5,8),bodyMat);
+            body.rotation.z=Math.PI/2;
+            aircraft.add(body);
+
+            const nose=new THREE.Mesh(new THREE.ConeGeometry(1.15,3.8,8),bodyMat);
+            nose.rotation.z=-Math.PI/2;
+            nose.position.x=8.55;
+            aircraft.add(nose);
+
+            const cockpit=new THREE.Mesh(new THREE.SphereGeometry(1.18,16,10,0,Math.PI*2,0,Math.PI*0.55),cockpitMat);
+            cockpit.scale.set(2.25,0.72,1);
+            cockpit.rotation.z=Math.PI/2;
+            cockpit.position.set(2.6,1.0,0);
+            aircraft.add(cockpit);
+
+            const wingShape=new THREE.Shape();
+            wingShape.moveTo(4.8,0);
+            wingShape.lineTo(0.4,7.2);
+            wingShape.lineTo(-4.8,4.2);
+            wingShape.lineTo(-2.0,1.0);
+            wingShape.lineTo(5.5,0.8);
+            wingShape.closePath();
+            const wingGeom=new THREE.ExtrudeGeometry(wingShape,{depth:0.24,bevelEnabled:false});
+            wingGeom.translate(0,-0.12,0);
+            const leftWing=new THREE.Mesh(wingGeom,bodyMat);
+            leftWing.position.z=0.15;
+            aircraft.add(leftWing);
+            const rightWing=leftWing.clone();
+            rightWing.scale.z=-1;
+            rightWing.position.z=-0.15;
+            aircraft.add(rightWing);
+
+            [-1,1].forEach(z=>{
+                const fin=new THREE.Mesh(new THREE.BoxGeometry(3.4,2.8,0.18),darkMat);
+                fin.position.set(-4.0,1.65,z);
+                fin.rotation.z=z<0 ? -0.16 : 0.16;
+                aircraft.add(fin);
+
+                const engine=new THREE.Mesh(new THREE.CylinderGeometry(0.48,0.55,3.8,12),darkMat);
+                engine.rotation.z=Math.PI/2;
+                engine.position.set(-5.0,0,z);
+                aircraft.add(engine);
+
+                const exhaust=new THREE.Mesh(new THREE.CylinderGeometry(0.30,0.38,0.25,12),new THREE.MeshBasicMaterial({color:0xff8a3d}));
+                exhaust.rotation.z=Math.PI/2;
+                exhaust.position.set(-6.95,0,z);
+                aircraft.add(exhaust);
+
+                const canard=new THREE.Mesh(new THREE.BoxGeometry(2.6,0.16,2.6),darkMat);
+                canard.position.set(3.2,0.15,z*2.0);
+                canard.rotation.y=z<0 ? -0.22 : 0.22;
+                aircraft.add(canard);
+            });
+
+            const tailCone=new THREE.Mesh(new THREE.ConeGeometry(0.85,2.0,8),darkMat);
+            tailCone.rotation.z=Math.PI/2;
+            tailCone.position.x=-7.2;
+            aircraft.add(tailCone);
+
+            aircraft.position.set(cx,3.2,cz);
             aircraft.rotation.y=Math.PI/2;
+            aircraft.traverse(o=>{
+                if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; }
+            });
             aircraft.visible=false;
             szenerieGruppe.add(aircraft);
             geheimesFlugzeug=aircraft;
