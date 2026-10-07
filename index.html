@@ -1217,12 +1217,34 @@
 
             const uniformMat = new THREE.MeshLambertMaterial({ color: 0x3d5137 });
             const darkMat = new THREE.MeshLambertMaterial({ color: 0x202622 });
+            const armorMat = new THREE.MeshLambertMaterial({ color: 0x29352c });
             const skinMat = new THREE.MeshLambertMaterial({ color: 0xc58b68 });
+            const metalMat = new THREE.MeshLambertMaterial({ color: 0x171b19 });
 
+            // Körper + taktische Schutzweste
             const body = new THREE.Mesh(new THREE.BoxGeometry(1.25, 1.65, 0.65), uniformMat);
             body.position.y = 1.65;
             soldier.add(body);
 
+            const vest = new THREE.Mesh(new THREE.BoxGeometry(1.34, 1.05, 0.72), armorMat);
+            vest.position.set(0, 1.78, -0.02);
+            soldier.add(vest);
+
+            // Schulterplatten und Magazintaschen
+            for(const side of [-1,1]) {
+                const shoulder = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.22, 0.55), armorMat);
+                shoulder.position.set(side * 0.72, 2.25, 0);
+                shoulder.rotation.z = side * 0.18;
+                soldier.add(shoulder);
+
+                for(let p=0;p<2;p++) {
+                    const pouch = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.32, 0.18), darkMat);
+                    pouch.position.set(side * (0.22 + p*0.31), 1.48, -0.38);
+                    soldier.add(pouch);
+                }
+            }
+
+            // Kopf, Helm mit Rand und einfachem Visier
             const head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 10), skinMat);
             head.position.y = 2.75;
             soldier.add(head);
@@ -1231,28 +1253,81 @@
             helmet.position.y = 2.95;
             soldier.add(helmet);
 
+            const helmetRim = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.12, 0.58), darkMat);
+            helmetRim.position.set(0, 2.84, -0.05);
+            soldier.add(helmetRim);
+
+            const goggles = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.13, 0.12), metalMat);
+            goggles.position.set(0, 2.76, -0.39);
+            soldier.add(goggles);
+
+            // Hals und kleiner Rucksack
+            const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.22, 8), skinMat);
+            neck.position.y = 2.43;
+            soldier.add(neck);
+
+            const backpack = new THREE.Mesh(new THREE.BoxGeometry(0.76, 1.0, 0.34), darkMat);
+            backpack.position.set(0, 1.82, 0.48);
+            soldier.add(backpack);
+
             let leftLeg, rightLeg, leftArm, rightArm;
             for(const side of [-1,1]) {
                 const leg = new THREE.Mesh(new THREE.BoxGeometry(0.38, 1.35, 0.42), darkMat);
                 leg.position.set(side*0.3, 0.55, 0);
                 soldier.add(leg);
+
+                const boot = new THREE.Mesh(new THREE.BoxGeometry(0.43, 0.28, 0.62), metalMat);
+                boot.position.set(side*0.3, 0.08, -0.10);
+                soldier.add(boot);
+
+                const knee = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.28, 0.47), armorMat);
+                knee.position.set(side*0.3, 0.72, -0.12);
+                soldier.add(knee);
+
                 const arm = new THREE.Mesh(new THREE.BoxGeometry(0.32, 1.25, 0.32), uniformMat);
                 arm.position.set(side*0.82, 1.75, 0);
                 arm.rotation.z = side * 0.22;
                 soldier.add(arm);
+
+                const glove = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.25, 0.34), darkMat);
+                glove.position.set(side*0.82, 1.12, -0.02);
+                soldier.add(glove);
+
                 if(side === -1) { leftLeg = leg; leftArm = arm; }
                 else { rightLeg = leg; rightArm = arm; }
             }
 
-            // Gewehr in den Händen
+            // Sturmgewehr mit Lauf, Schaft und Zielfernrohr
             const rifle = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 1.9), darkMat);
             rifle.position.set(0.52, 1.65, -0.75);
             rifle.rotation.x = Math.PI/2;
             soldier.add(rifle);
 
+            const rifleStock = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.20, 0.55), metalMat);
+            rifleStock.position.set(0.52, 1.65, -0.02);
+            rifleStock.rotation.x = Math.PI/2;
+            soldier.add(rifleStock);
+
+            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.55, 8), metalMat);
+            barrel.rotation.x = Math.PI/2;
+            barrel.position.set(0.52, 1.65, -1.94);
+            soldier.add(barrel);
+
+            const scope = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.10, 0.52), metalMat);
+            scope.position.set(0.52, 1.83, -0.78);
+            scope.rotation.x = Math.PI/2;
+            soldier.add(scope);
+
             // Explizite Körperteile für saubere Animationen
+            soldier.traverse(obj => {
+                if(obj.isMesh) {
+                    obj.castShadow = true;
+                    obj.receiveShadow = true;
+                }
+            });
+
             soldier.userData.parts = {
-                body, head, helmet, uniformMat,
+                body, head, helmet, uniformMat, armorMat,
                 leftLeg, rightLeg, leftArm, rightArm, rifle
             };
             soldier.userData.parts.leftLeg.name = "leftLeg";
@@ -1277,8 +1352,8 @@
                 gegnerArray.push({
                     mesh,
                     material: mesh.userData.parts.uniformMat,
-                    hp: 100 + (spieler.mission * 20),
-                    maxHp: 100 + (spieler.mission * 20),
+                    hp: 105 + (spieler.mission * 28),
+                    maxHp: 105 + (spieler.mission * 28),
                     flashTimer: 0,
                     attackCooldown: Math.random()*1.5,
                     animTime: Math.random()*10,
@@ -1423,7 +1498,7 @@
             aktuellesZiel = missionsziele[(spieler.mission - 1) % missionsziele.length];
 
             if(aktuellesZiel.typ === "ueberleben") {
-                zielZeit = 18 + spieler.mission * 3;
+                zielZeit = 22 + spieler.mission * 4;
             }
 
             if(aktuellesZiel.typ === "erreichen") {
@@ -1499,7 +1574,7 @@
                 scene.remove(zielZone);
                 zielZone = null;
             }
-            const gegnerAnzahl = 2 + spieler.mission;
+            const gegnerAnzahl = Math.min(16, 3 + spieler.mission + Math.floor(spieler.mission / 3));
             erstelleGegner(gegnerAnzahl);
             neuesMissionsziel();
         }
@@ -1717,7 +1792,8 @@
 
                 // Soldaten bleiben zunächst an ihrem Spawnpunkt.
                 // Sie entdecken den Spieler erst, wenn er in ihrer Sichtweite ist.
-                if(!g.entdeckt && dist < 42) {
+                const erkennungReichweite = 42 + spieler.mission * 1.8;
+                if(!g.entdeckt && dist < erkennungReichweite) {
                     const blickrichtung = new THREE.Vector3();
                     camera.getWorldDirection(blickrichtung);
                     blickrichtung.y = 0;
@@ -1736,7 +1812,8 @@
                         spielerZiel.y = 1.4;
                         const freieSicht = istSichtkontakt(soldatAuge, spielerZiel);
 
-                        if(freieSicht && (sichtwinkel > 0.45 || dist < 12)) {
+                        const sichtSchwelle = Math.max(0.30, 0.45 - spieler.mission * 0.012);
+                        if(freieSicht && (sichtwinkel > sichtSchwelle || dist < 12)) {
                             g.entdeckt = true;
                             g.entdeckungsZeit = 0;
                         }
@@ -1796,15 +1873,15 @@
                     const schutzDist = g.schutzpunkt ? g.mesh.position.distanceTo(g.schutzpunkt) : 0;
                     if(dist > 6 && (!g.schutzpunkt || schutzDist < 18)) {
                         richtung.normalize();
-                        g.mesh.position.addScaledVector(richtung, delta * (2.0 + spieler.mission * 0.12));
+                        g.mesh.position.addScaledVector(richtung, delta * (2.25 + spieler.mission * 0.18));
                     }
                 } else if(g.verhalten === "scharfschuetze") {
                     if(dist < 16) {
                         richtung.normalize();
-                        g.mesh.position.addScaledVector(richtung, -delta * 1.0);
+                        g.mesh.position.addScaledVector(richtung, -delta * (1.05 + spieler.mission * 0.035));
                     } else if(dist > 28) {
                         richtung.normalize();
-                        g.mesh.position.addScaledVector(richtung, delta * 0.8);
+                        g.mesh.position.addScaledVector(richtung, delta * (0.85 + spieler.mission * 0.035));
                     } else {
                         // Kleine seitliche Positionsänderungen, damit der Scharfschütze nicht stillsteht
                         const side = new THREE.Vector3(-richtung.z, 0, richtung.x).multiplyScalar(g.strafeDir);
@@ -1813,31 +1890,31 @@
                             g.strafeDir *= -1;
                             g.strafeTimer = 1.5 + Math.random()*2;
                         }
-                        g.mesh.position.addScaledVector(side, delta * 0.35);
+                        g.mesh.position.addScaledVector(side, delta * (0.40 + spieler.mission * 0.015));
                     }
                 } else if(g.verhalten === "flanker") {
                     const side = new THREE.Vector3(-richtung.z, 0, richtung.x).multiplyScalar(g.strafeDir);
                     if(dist > 10) {
                         richtung.normalize();
                         ziel.copy(richtung).multiplyScalar(0.55).add(side.normalize().multiplyScalar(0.8)).normalize();
-                        g.mesh.position.addScaledVector(ziel, delta * 1.55);
+                        g.mesh.position.addScaledVector(ziel, delta * (1.70 + spieler.mission * 0.10));
                     } else {
                         g.strafeTimer -= delta;
                         if(g.strafeTimer <= 0) {
                             g.strafeDir *= -1;
                             g.strafeTimer = 1 + Math.random()*1.5;
                         }
-                        g.mesh.position.addScaledVector(side.normalize(), delta * 1.0 * g.strafeDir);
+                        g.mesh.position.addScaledVector(side.normalize(), delta * (1.10 + spieler.mission * 0.06) * g.strafeDir);
                     }
                 } else {
                     // Verteidiger: bewegt sich nur begrenzt vom Spawnpunkt weg
                     const homeDir = new THREE.Vector3().subVectors(g.spawnPosition, g.mesh.position);
                     if(homeDir.length() > 9) {
                         homeDir.normalize();
-                        g.mesh.position.addScaledVector(homeDir, delta * 1.2);
+                        g.mesh.position.addScaledVector(homeDir, delta * (1.30 + spieler.mission * 0.05));
                     } else if(dist < 13) {
                         richtung.normalize();
-                        g.mesh.position.addScaledVector(richtung, -delta * 0.8);
+                        g.mesh.position.addScaledVector(richtung, -delta * (0.90 + spieler.mission * 0.04));
                     }
                 }
 
@@ -1871,9 +1948,10 @@
                     // Soldaten schießen jetzt wirklich auf den Spieler.
                     g.shotCooldown -= delta;
                     if(g.shotCooldown <= 0 && dist > 5) {
-                        const cooldownBase = g.verhalten === "scharfschuetze" ? 2.2 :
-                                             g.verhalten === "angreifer" ? 1.0 : 1.5;
-                        g.shotCooldown = cooldownBase + Math.random()*1.2;
+                        const cooldownBase = g.verhalten === "scharfschuetze" ? 1.65 :
+                                             g.verhalten === "angreifer" ? 0.82 : 1.20;
+                        const schwierigkeitsFaktor = Math.max(0.52, 1 - spieler.mission * 0.035);
+                        g.shotCooldown = (cooldownBase * schwierigkeitsFaktor) + Math.random()*(0.75 + schwierigkeitsFaktor*0.45);
                         g.muzzleTime = 0.16;
                         g.shootAnimTime = 0.16;
                         g.shootRecoil = 0;
@@ -1895,14 +1973,16 @@
                         }
 
                         // Trefferchance abhängig vom Soldatentyp und der Entfernung.
-                        const accuracyBase = g.verhalten === "scharfschuetze" ? 0.88 :
-                                             g.verhalten === "angreifer" ? 0.48 : 0.65;
+                        const accuracyBase = g.verhalten === "scharfschuetze" ? 0.90 :
+                                             g.verhalten === "angreifer" ? 0.53 : 0.70;
                         const distancePenalty = Math.min(dist / 70, 0.30);
-                        const hitChance = Math.max(0.25, accuracyBase - distancePenalty);
+                        const missionAccuracy = Math.min(0.12, spieler.mission * 0.010);
+                        const hitChance = Math.min(0.96, Math.max(0.28, accuracyBase + missionAccuracy - distancePenalty));
 
                         if(Math.random() < hitChance) {
-                            const damage = g.verhalten === "scharfschuetze" ? 12 :
-                                           g.verhalten === "angreifer" ? 7 : 9;
+                            const damage = (g.verhalten === "scharfschuetze" ? 14 :
+                                           g.verhalten === "angreifer" ? 8 : 10) +
+                                           Math.floor(spieler.mission * 0.8);
                             spieler.hp = Math.max(0, spieler.hp - damage);
                             spieler.lastDamageTime = 0.18;
                             playPlayerHitSound();
