@@ -1444,7 +1444,7 @@
             // Durchgehende, segmentierte Außenmauer.
             for(let i=0;i<8;i++){
                 const off=-28+i*8;
-                makeWall(cx+off,wallH/2,cz-half,8.1,wallH,wallT,'sperrmauer',420);
+                if(i>1) makeWall(cx+off,wallH/2,cz-half,8.1,wallH,wallT,'sperrmauer',420);
                 makeWall(cx+off,wallH/2,cz+half,8.1,wallH,wallT,'sperrmauer',420);
                 makeWall(cx-half,wallH/2,cz+off,wallT,wallH,8.1,'sperrmauer',420);
                 makeWall(cx+half,wallH/2,cz+off,wallT,wallH,8.1,'sperrmauer',420);
@@ -1476,7 +1476,7 @@
                 plate.position.set(-hw/2+0.6+pw*(i+0.5),hh/2,hd/2);
                 plate.castShadow=true; plate.receiveShadow=true;
                 plate.userData.zielTyp='flugzeugPanzerplatte';
-                plate.userData.hp=300; plate.userData.maxHp=300; plate.userData.zerstoert=false;
+                plate.userData.hp=120; plate.userData.maxHp=120; plate.userData.zerstoert=false;
                 hangar.add(plate);
                 panzerZerstoerbareObjekte.push(plate);
                 weltKollisionsobjekte.push(plate);
@@ -2475,7 +2475,7 @@
             } else if(spieler.mission===2) {
                 aktuellesZiel={typ:"panzer_fahrt",name:"Bringe den Panzer sicher nach draußen in unser Versteck"};
             } else if(spieler.mission===3) {
-                aktuellesZiel={typ:"flugzeug",name:"Mit dem Panzer die Sperrmauer durchbrechen"};
+                aktuellesZiel={typ:"flugzeug",name:"Dringe in das Gebiet ein und zerstöre den Hangar"};
             } else if(spieler.mission===11) {
                 aktuellesZiel={typ:"geisel",name:"Rette die Geisel – kein Alarm!"};
             } else if(spieler.mission===12) {
@@ -3283,8 +3283,8 @@
                 const plattenRest=panzerZerstoerbareObjekte.some(o=>o.userData.zielTyp==='flugzeugPanzerplatte' && !o.userData.zerstoert);
                 if(!mauerRest) panzerGebietOffen=true;
                 if(aktuellesZiel && aktuellesZiel.typ==='flugzeug'){
-                    if(mauerRest) aktuellesZiel.name='Mit dem Panzer die Sperrmauer durchbrechen';
-                    else if(plattenRest) aktuellesZiel.name='Zerschieße die Panzerplatten des Hangars';
+                    if(mauerRest) aktuellesZiel.name='Dringe in das Gebiet ein und zerstöre den Hangar';
+                    else if(plattenRest) aktuellesZiel.name='Zerstöre die Panzerplatten des Hangars';
                     else aktuellesZiel.name='Finde das geheime Flugzeug im Hangar';
                 }
                 if(!plattenRest && geheimesFlugzeug){
