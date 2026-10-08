@@ -3404,7 +3404,8 @@
             if(!spielerImPanzer) korrigiereGebaeudeKollision(vorherX, vorherZ);
 
             // Unsichtbare Grenzen der Spielwelt: der Spieler kann die Szenerie nicht verlassen.
-            const weltGrenze = 126;
+            // Mission 4 ist deutlich größer und nutzt wie das Flugzeug den Bereich ±245.
+            const weltGrenze = spieler.mission === 4 ? 245 : 126;
             camera.position.x = Math.max(-weltGrenze, Math.min(weltGrenze, camera.position.x));
             camera.position.z = Math.max(-weltGrenze, Math.min(weltGrenze, camera.position.z));
             if(!spielerImPanzer) aktualisiereEtagenMarker();
