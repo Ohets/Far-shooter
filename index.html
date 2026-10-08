@@ -2431,9 +2431,11 @@
                 const steuerung=moveInput.y;
                 if(Math.abs(steuerung)>0.05){
                     lastwagenObjekt.rotation.y -= moveInput.x * delta * 0.8;
+                    // Der Lastwagen zeigt mit seiner Fahrzeugfront entlang seiner lokalen +X-Achse.
+                    // Dadurch fährt er beim Gasgeben tatsächlich in die Richtung, in die er zeigt.
                     const vorwaerts=new THREE.Vector3(
-                        Math.sin(lastwagenObjekt.rotation.y),0,Math.cos(lastwagenObjekt.rotation.y)
-                    ).multiplyScalar(-steuerung * delta * 6.0);
+                        Math.cos(lastwagenObjekt.rotation.y),0,-Math.sin(lastwagenObjekt.rotation.y)
+                    ).multiplyScalar(steuerung * delta * 6.0);
                     lastwagenObjekt.position.add(vorwaerts);
                     lastwagenObjekt.position.x=Math.max(-245,Math.min(245,lastwagenObjekt.position.x));
                     lastwagenObjekt.position.z=Math.max(-245,Math.min(245,lastwagenObjekt.position.z));
@@ -2443,7 +2445,8 @@
                 rotationX += lookInput.y * delta * 1.25;
                 rotationX=Math.max(-0.65,Math.min(0.5,rotationX));
 
-                const sitzOffset=new THREE.Vector3(0,4.2,-10.0);
+                // Kamera bleibt hinter der Fahrzeugfront (lokale -X-Seite).
+                const sitzOffset=new THREE.Vector3(-10.0,4.2,0);
                 sitzOffset.applyAxisAngle(new THREE.Vector3(0,1,0),lastwagenObjekt.rotation.y);
                 camera.position.copy(lastwagenObjekt.position).add(sitzOffset);
                 camera.position.y=4.2;
