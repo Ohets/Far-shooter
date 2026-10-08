@@ -1867,14 +1867,15 @@
                 Math.cos(flugzeugObjekt.rotation.z)
             );
 
-            const lift=9.81*liftFactor*0.92*bankFactor;
+            const lift=9.81*liftFactor*0.62*bankFactor;
 
             // Nase hoch -> Steigflug; Nase runter -> Sinkflug.
             const pitchEffect=Math.sin(flugzeugPitch)*speed*0.18;
 
             // Schwerkraft + Auftrieb + Pitch.
+            const gravity=13.5;
             const verticalAcceleration=
-                (lift-9.81)*0.72+
+                lift-gravity+
                 pitchEffect;
 
             flugzeugVertikalGeschwindigkeit +=
