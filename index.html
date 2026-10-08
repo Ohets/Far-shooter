@@ -27,6 +27,7 @@
         #plane-throttle .knob { position:absolute; left:2px; width:26px; height:26px; bottom:14%; transform:translateY(50%); border-radius:50%; background:#fff; border:2px solid #69c8ff; box-sizing:border-box; pointer-events:none; }
         #plane-throttle-label { display:none; position:absolute; left:145px; bottom:168px; color:white; font-weight:bold; font-size:11px; text-shadow:1px 1px 2px #000; z-index:7; pointer-events:none; }
         #plane-btn { display:none; position:absolute; bottom:315px; left:50%; transform:translateX(-50%); padding:12px 18px; background:rgba(45,85,120,0.95); border:2px solid #8fd3ff; color:white; border-radius:8px; font-weight:bold; font-size:15px; pointer-events:auto; z-index:6; }
+        #plane-warning { display:none; position:absolute; top:24%; left:50%; transform:translate(-50%,-50%); width:min(88vw,520px); box-sizing:border-box; padding:18px 22px; background:rgba(12,24,34,0.94); border:2px solid #8fd3ff; border-radius:12px; color:white; text-align:center; font-size:18px; font-weight:bold; line-height:1.45; text-shadow:2px 2px 3px #000; z-index:40; pointer-events:none; box-shadow:0 0 24px rgba(80,180,255,0.35); }
         #tank-btn { display:none; position:absolute; bottom:245px; left:50%; transform:translateX(-50%); padding:12px 18px; background:rgba(70,105,55,0.94); border:2px solid #b7d77a; color:white; border-radius:8px; font-weight:bold; font-size:15px; pointer-events:auto; z-index:6; }
         #aim-btn { position: absolute; bottom: 160px; right: 135px; width: 64px; height: 64px; background: rgba(60,60,60,0.78); border: 2px solid rgba(255,255,255,0.65); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; pointer-events: auto; touch-action: none; z-index: 4; }
         #aim-btn.aktiv { background: rgba(40,140,255,0.9); border-color: #8fd3ff; }
@@ -75,6 +76,7 @@
     <div id="fire-btn" class="ui-element">FEUER</div>
     <div id="tank-btn">PANZER EINSTEIGEN</div>
     <div id="plane-btn">FLUGZEUG EINSTEIGEN</div>
+    <div id="plane-warning">⚠️ ACHTUNG ⚠️<br><span>Das Flugzeug hat eine geheime Steuerung.<br>Ich hoffe, du kannst damit fliegen!</span></div>
     <div id="tank-scope">ZIELROHR</div>
     <div id="level-btn">LEVEL</div>
     <div id="shop-btn">WAFFEN-SHOP</div>
@@ -408,7 +410,7 @@
         let panzerZerstoerbareObjekte = [];
         let panzerGebietOffen = false;
         let geheimesFlugzeug = null;
-        let flugzeugObjekt=null, flugzeugZielPosition=new THREE.Vector3(-70,0,-75), spielerImFlugzeug=false, flugzeugGeschwindigkeit=0, flugzeugPitch=0;
+        let flugzeugObjekt=null, flugzeugZielPosition=new THREE.Vector3(-180,0,-190), spielerImFlugzeug=false, flugzeugGeschwindigkeit=0, flugzeugPitch=0;
         let flugzeugVertikalGeschwindigkeit=0;
         let planeThrottleInput=0.18;
 
@@ -1704,18 +1706,18 @@
                 if(o.isSprite && Math.abs(o.position.x-85)<1 && Math.abs(o.position.z+85)<1) o.visible=false;
             });
 
-            const runway=new THREE.Mesh(new THREE.PlaneGeometry(18,210),new THREE.MeshLambertMaterial({color:0x25282a}));
+            const runway=new THREE.Mesh(new THREE.PlaneGeometry(18,420),new THREE.MeshLambertMaterial({color:0x25282a}));
             runway.rotation.x=-Math.PI/2; runway.position.set(85,0.03,-5); runway.receiveShadow=true; szenerieGruppe.add(runway);
             const lineMat=new THREE.MeshBasicMaterial({color:0xffffff});
-            for(let z=-100;z<=90;z+=12){
+            for(let z=-210;z<=200;z+=12){
                 const line=new THREE.Mesh(new THREE.PlaneGeometry(0.45,6),lineMat);
                 line.rotation.x=-Math.PI/2; line.position.set(85,0.06,z); szenerieGruppe.add(line);
             }
             for(const x of [76.2,93.8]){
-                const edge=new THREE.Mesh(new THREE.PlaneGeometry(0.18,210),lineMat);
+                const edge=new THREE.Mesh(new THREE.PlaneGeometry(0.18,420),lineMat);
                 edge.rotation.x=-Math.PI/2; edge.position.set(x,0.055,-5); szenerieGruppe.add(edge);
             }
-            for(let z=-100;z<=90;z+=15) for(const x of [75.2,94.8]){
+            for(let z=-210;z<=200;z+=15) for(const x of [75.2,94.8]){
                 const light=new THREE.Mesh(new THREE.SphereGeometry(0.16,8,6),new THREE.MeshBasicMaterial({color:0xffd34d}));
                 light.position.set(x,0.18,z); szenerieGruppe.add(light);
             }
@@ -1761,6 +1763,14 @@
             }
             if(camera.position.distanceTo(flugzeugObjekt.position)>7) return;
             spielerImFlugzeug=true;
+            const warnung=document.getElementById('plane-warning');
+            if(warnung){
+                warnung.style.display='block';
+                clearTimeout(window.flugzeugWarnungTimer);
+                window.flugzeugWarnungTimer=setTimeout(()=>{
+                    warnung.style.display='none';
+                },5000);
+            }
             moveInput={x:0,y:0}; lookInput={x:0,y:0};
             flugzeugPitch=0; flugzeugGeschwindigkeit=0; flugzeugVertikalGeschwindigkeit=0; flugzeugObjekt.rotation.x=0; flugzeugObjekt.rotation.z=0;
             planeThrottleInput=0.18;
@@ -1801,12 +1811,14 @@
             flugzeugGeschwindigkeit += acceleration*delta;
             flugzeugGeschwindigkeit=THREE.MathUtils.clamp(flugzeugGeschwindigkeit,0,maxSpeed);
 
-            // Schub komplett weg -> Propeller-/Luftwiderstand bremst langsam.
-            if(throttle<0.03){
+            // Schub komplett weg -> das Flugzeug bremst bis zum Stillstand.
+            // Bei 0 % Schub bleibt es nicht endlos weiterrollen.
+            if(throttle<=0.06){
                 flugzeugGeschwindigkeit=Math.max(
                     0,
-                    flugzeugGeschwindigkeit-(3.5+speed*0.035)*delta
+                    flugzeugGeschwindigkeit-(10.5+speed*0.10)*delta
                 );
+                if(flugzeugGeschwindigkeit<0.35) flugzeugGeschwindigkeit=0;
             }
 
             // --- STEUERUNG ---
@@ -1943,9 +1955,9 @@
             }
 
             flugzeugObjekt.position.x=
-                THREE.MathUtils.clamp(flugzeugObjekt.position.x,-118,118);
+                THREE.MathUtils.clamp(flugzeugObjekt.position.x,-245,245);
             flugzeugObjekt.position.z=
-                THREE.MathUtils.clamp(flugzeugObjekt.position.z,-118,118);
+                THREE.MathUtils.clamp(flugzeugObjekt.position.z,-245,245);
 
             // --- CHASE CAMERA ---
             const cameraTarget=flugzeugObjekt.position.clone().add(
@@ -2131,7 +2143,7 @@
             if(missionsNummer!==4) baueWachtuerme(missionsNummer);
 
             const floor = new THREE.Mesh(
-                new THREE.PlaneGeometry(260, 260),
+                new THREE.PlaneGeometry(520, 520),
                 new THREE.MeshLambertMaterial({color:daten.boden})
             );
             floor.rotation.x = -Math.PI / 2;
@@ -2427,7 +2439,7 @@
 
             // Straße/Fluchtweg in jeder Mission, aber passend zur Umgebung.
             const road = new THREE.Mesh(
-                new THREE.PlaneGeometry(18,240),
+                new THREE.PlaneGeometry(18,420),
                 new THREE.MeshLambertMaterial({color:
                     daten.objekt === "schnee" ? 0x9da5a5 :
                     daten.objekt === "wueste" ? 0x6e5436 : 0x514d3f})
