@@ -413,6 +413,12 @@
         let flugzeugObjekt=null, flugzeugZielPosition=new THREE.Vector3(-180,0,-190), spielerImFlugzeug=false, flugzeugGeschwindigkeit=0, flugzeugPitch=0;
         let flugzeugVertikalGeschwindigkeit=0;
         let planeThrottleInput=0.18;
+        let flugzeugHp=100;
+        let mission4UebergangMarker=null;
+        let mission4UebergangAktiv=false;
+        let munitionslagerObjekt=null;
+        let munitionslagerHp=3;
+        let munitionslagerZerstoert=false;
 
         // Begehbare Gebäude: nur Wände blockieren den Spieler, die Türen bleiben offen.
         let weltKollisionsobjekte = [];
@@ -1745,6 +1751,256 @@
             beacon.position.y=3; safe.add(ring,beacon); safe.position.set(zielX,0,zielZ); szenerieGruppe.add(safe);
         }
 
+
+        function baueMission5Munitionslager(){
+            const lager=new THREE.Group();
+            const cx=0, cz=-82;
+            const wandMat=new THREE.MeshLambertMaterial({color:0x4a5150});
+            const dachMat=new THREE.MeshLambertMaterial({color:0x252a2c});
+            const bodenMat=new THREE.MeshLambertMaterial({color:0x303334});
+
+            const boden=new THREE.Mesh(new THREE.BoxGeometry(34,0.3,26),bodenMat);
+            boden.position.set(cx,0.15,cz);
+            lager.add(boden);
+
+            const rueck=new THREE.Mesh(new THREE.BoxGeometry(34,8,0.7),wandMat);
+            rueck.position.set(cx,4,cz-13);
+            lager.add(rueck);
+            const links=new THREE.Mesh(new THREE.BoxGeometry(0.7,8,26),wandMat);
+            links.position.set(cx-17,4,cz);
+            lager.add(links);
+            const rechts=links.clone();
+            rechts.position.x=cx+17;
+            lager.add(rechts);
+
+            const dach=new THREE.Mesh(new THREE.BoxGeometry(35,0.7,27),dachMat);
+            dach.position.set(cx,8.35,cz);
+            lager.add(dach);
+
+            // Große offene Zufahrt zum Munitionslager.
+            const pfostenMat=new THREE.MeshLambertMaterial({color:0x697274});
+            [-12,12].forEach(px=>{
+                const p=new THREE.Mesh(new THREE.BoxGeometry(0.8,7,0.8),pfostenMat);
+                p.position.set(cx+px,3.5,cz+13);
+                lager.add(p);
+            });
+            const torbalken=new THREE.Mesh(new THREE.BoxGeometry(24,0.8,0.8),pfostenMat);
+            torbalken.position.set(cx,7,cz+13);
+            lager.add(torbalken);
+
+            // Munitionskisten im Lager.
+            const crateMat=new THREE.MeshLambertMaterial({color:0x705238});
+            for(let i=0;i<12;i++){
+                const crate=new THREE.Mesh(new THREE.BoxGeometry(2.2,1.7,2.2),crateMat);
+                crate.position.set(cx-10+(i%4)*6,0.85,cz-7+Math.floor(i/4)*6);
+                crate.castShadow=true;
+                crate.userData.munitionskiste=true;
+                lager.add(crate);
+            }
+
+            const warningMat=new THREE.MeshBasicMaterial({color:0xffb000});
+            for(const p of [[-6,2.0],[6,2.0]]){
+                const warning=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.5,0.08),warningMat);
+                warning.position.set(cx+p[0],p[1],cz+13.45);
+                lager.add(warning);
+            }
+
+            lager.traverse(o=>{
+                if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}
+            });
+            szenerieGruppe.add(lager);
+
+            const ring=new THREE.Mesh(
+                new THREE.RingGeometry(10,12,40),
+                new THREE.MeshBasicMaterial({color:0xff7b00,side:THREE.DoubleSide,transparent:true,opacity:0.78})
+            );
+            ring.rotation.x=-Math.PI/2;
+            ring.position.set(cx,0.08,cz);
+            szenerieGruppe.add(ring);
+
+            const beacon=new THREE.Mesh(
+                new THREE.CylinderGeometry(0.18,0.18,7,8),
+                new THREE.MeshBasicMaterial({color:0xff7b00})
+            );
+            beacon.position.set(cx,3.5,cz);
+            szenerieGruppe.add(beacon);
+
+            const canvas=document.createElement('canvas');
+            canvas.width=512; canvas.height=96;
+            const ctx=canvas.getContext('2d');
+            ctx.fillStyle='rgba(0,0,0,0.86)';
+            ctx.fillRect(0,0,512,96);
+            ctx.fillStyle='#ffb000';
+            ctx.font='bold 34px sans-serif';
+            ctx.textAlign='center';
+            ctx.fillText('MUNITIONSLAGER',256,58);
+            const label=new THREE.Sprite(new THREE.SpriteMaterial({
+                map:new THREE.CanvasTexture(canvas),
+                transparent:true,
+                depthTest:false
+            }));
+            label.scale.set(7.5,1.4,1);
+            label.position.set(cx,8.8,cz);
+            szenerieGruppe.add(label);
+
+            munitionslagerObjekt={gruppe:lager, ring, beacon, label, x:cx, z:cz};
+            munitionslagerHp=3;
+            munitionslagerZerstoert=false;
+        }
+
+        function mission5Bombardieren(){
+            if(spieler.mission!==5 || !spielerImFlugzeug || munitionslagerZerstoert) return;
+
+            playShootSound();
+
+            const bomb=new THREE.Mesh(
+                new THREE.SphereGeometry(0.28,8,8),
+                new THREE.MeshLambertMaterial({color:0x202020})
+            );
+            bomb.position.copy(flugzeugObjekt.position);
+            scene.add(bomb);
+
+            const zielX=bomb.position.x;
+            const zielZ=bomb.position.z;
+            const startY=bomb.position.y;
+            const start=performance.now();
+
+            const tick=()=>{
+                const t=Math.min((performance.now()-start)/500,1);
+                bomb.position.y=Math.max(0.25,startY-(startY-0.25)*t);
+                if(t<1){
+                    requestAnimationFrame(tick);
+                    return;
+                }
+
+                const explosionsPunkt=new THREE.Vector3(zielX,0.8,zielZ);
+                const lagerDistanz=Math.hypot(
+                    explosionsPunkt.x-munitionslagerObjekt.x,
+                    explosionsPunkt.z-munitionslagerObjekt.z
+                );
+
+                if(lagerDistanz<16){
+                    munitionslagerHp--;
+                    if(munitionslagerObjekt.ring) munitionslagerObjekt.ring.material.color.setHex(0xff3300);
+
+                    if(munitionslagerHp<=0){
+                        munitionslagerZerstoert=true;
+                        if(munitionslagerObjekt.ring) munitionslagerObjekt.ring.visible=false;
+                        if(munitionslagerObjekt.beacon) munitionslagerObjekt.beacon.visible=false;
+                        if(munitionslagerObjekt.label) munitionslagerObjekt.label.visible=false;
+                        missionErfolgreich();
+                    }
+                }
+
+                const explosion=new THREE.Mesh(
+                    new THREE.SphereGeometry(1.0,12,10),
+                    new THREE.MeshBasicMaterial({color:0xff8a22,transparent:true,opacity:0.9})
+                );
+                explosion.position.copy(explosionsPunkt);
+                scene.add(explosion);
+                const explosionStart=performance.now();
+                const explosionTick=()=>{
+                    const p=Math.min((performance.now()-explosionStart)/320,1);
+                    explosion.scale.setScalar(1+p*7);
+                    explosion.material.opacity=0.9*(1-p);
+                    if(p<1) requestAnimationFrame(explosionTick);
+                    else {
+                        scene.remove(explosion);
+                        explosion.geometry.dispose();
+                        explosion.material.dispose();
+                    }
+                };
+                explosionTick();
+
+                scene.remove(bomb);
+                bomb.geometry.dispose();
+                bomb.material.dispose();
+                ausgebenUI();
+            };
+            tick();
+        }
+
+        function mission4AbschlussBereitFuer5(){
+            if(mission4UebergangAktiv) return;
+            mission4UebergangAktiv=true;
+            missionAbgeschlossen=true;
+            spieler.credits+=200;
+            spieler.mission=5;
+            aktuellesZiel={
+                typ:"flugzeug_uebergang",
+                name:"Fliege durch die grüne Markierung – der nächste Einsatz beginnt dort"
+            };
+
+            const q=new THREE.Quaternion().setFromEuler(
+                new THREE.Euler(flugzeugObjekt.rotation.x,flugzeugObjekt.rotation.y,flugzeugPitch,'YXZ')
+            );
+            const forward=new THREE.Vector3(1,0,0).applyQuaternion(q).normalize();
+
+            const marker=new THREE.Group();
+            const ring=new THREE.Mesh(
+                new THREE.RingGeometry(5.5,6.5,36),
+                new THREE.MeshBasicMaterial({color:0x00ff66,side:THREE.DoubleSide,transparent:true,opacity:0.85})
+            );
+            ring.rotation.x=-Math.PI/2;
+            marker.add(ring);
+
+            const beacon=new THREE.Mesh(
+                new THREE.CylinderGeometry(0.2,0.2,8,8),
+                new THREE.MeshBasicMaterial({color:0x00ff66})
+            );
+            beacon.position.y=4;
+            marker.add(beacon);
+
+            marker.position.copy(flugzeugObjekt.position).addScaledVector(forward,35);
+            marker.position.y=0.1;
+            szenerieGruppe.add(marker);
+            mission4UebergangMarker=marker;
+            ausgebenUI();
+        }
+
+        function oeffneMission5AusFlugzeug(){
+            if(!mission4UebergangAktiv || spieler.mission!==5 || !flugzeugObjekt || !mission4UebergangMarker) return;
+
+            const plane=flugzeugObjekt;
+            const planePosition=plane.position.clone();
+            const planeRotation=plane.rotation.clone();
+
+            if(plane.parent) plane.parent.remove(plane);
+            if(mission4UebergangMarker.parent) mission4UebergangMarker.parent.remove(mission4UebergangMarker);
+            mission4UebergangMarker=null;
+
+            baueSzenerie(5);
+
+            flugzeugObjekt=plane;
+            flugzeugObjekt.position.copy(planePosition);
+            flugzeugObjekt.rotation.copy(planeRotation);
+            flugzeugObjekt.visible=true;
+            szenerieGruppe.add(flugzeugObjekt);
+
+            spielerImFlugzeug=true;
+            flugzeugHp=100;
+            flugzeugGeschwindigkeit=Math.max(20,flugzeugGeschwindigkeit);
+            mission4UebergangAktiv=false;
+            missionAbgeschlossen=false;
+            munitionslagerHp=3;
+            baueMission5Munitionslager();
+
+            aktuellesZiel={
+                typ:"munitionslager",
+                name:"Bombardiere das Munitionslager"
+            };
+
+            gegnerArray.length=0;
+            erstelleGegner(10);
+            for(const g of gegnerArray){
+                g.schutzpunkt=new THREE.Vector3(0,0,-82);
+            }
+
+            rotationX=0;
+            rotationY=flugzeugObjekt.rotation.y;
+            ausgebenUI();
+        }
+
         function aktualisiereFlugzeugButton(){
             const btn=document.getElementById('plane-btn');
             if(!btn || spieler.mission!==4 || !flugzeugObjekt){ if(btn) btn.style.display='none'; return; }
@@ -2012,11 +2268,16 @@
             const zielDZ=flugzeugObjekt.position.z-flugzeugZielPosition.z;
             const zielDistanz2D=Math.hypot(zielDX,zielDZ);
 
-            if(zielDistanz2D<10 && flugzeugObjekt.position.y<25){
+            if(spieler.mission===4 && zielDistanz2D<10 && flugzeugObjekt.position.y<25){
                 planeThrottleInput=0;
                 flugzeugGeschwindigkeit=0;
                 flugzeugVertikalGeschwindigkeit=0;
-                missionErfolgreich();
+                mission4AbschlussBereitFuer5();
+            }
+
+            if(spieler.mission===5 && mission4UebergangMarker && !mission4UebergangAktiv===false){
+                const markerDist=flugzeugObjekt.position.distanceTo(mission4UebergangMarker.position);
+                if(markerDist<7) oeffneMission5AusFlugzeug();
             }
         }
 
@@ -2888,6 +3149,10 @@
         }
 
         function feuerWaffe() {
+            if(spielerImFlugzeug && spieler.mission===5){
+                mission5Bombardieren();
+                return;
+            }
             if(spielerImPanzer){
                 if(panzerFeuerCooldown>0 || !panzerObjekt) return;
                 panzerFeuerCooldown=0.85;
@@ -3023,6 +3288,8 @@
                 aktuellesZiel={typ:"flugzeug",name:"Dringe in das Gebiet ein und zerstöre den Hangar"};
             } else if(spieler.mission===4) {
                 aktuellesZiel={typ:"flugzeug_fahrt",name:"Bringe das Flugzeug in das sichere Versteck"};
+            } else if(spieler.mission===5) {
+                aktuellesZiel={typ:"munitionslager",name:"Bombardiere das Munitionslager"};
             } else if(spieler.mission===11) {
                 aktuellesZiel={typ:"geisel",name:"Rette die Geisel – kein Alarm!"};
             } else if(spieler.mission===12) {
@@ -3112,7 +3379,15 @@
 
             if(aktuellesZiel.typ === "flugzeug_fahrt" && flugzeugObjekt && !missionAbgeschlossen) {
                 const d=flugzeugObjekt.position.distanceTo(flugzeugZielPosition);
-                if(d<9 && flugzeugObjekt.position.y<7 && flugzeugGeschwindigkeit<12) missionErfolgreich();
+                if(d<9 && flugzeugObjekt.position.y<7 && flugzeugGeschwindigkeit<12) mission4AbschlussBereitFuer5();
+            }
+
+            if(aktuellesZiel.typ === "flugzeug_uebergang" && mission4UebergangMarker && flugzeugObjekt){
+                if(flugzeugObjekt.position.distanceTo(mission4UebergangMarker.position)<7) oeffneMission5AusFlugzeug();
+            }
+
+            if(aktuellesZiel.typ === "munitionslager" && munitionslagerZerstoert){
+                missionErfolgreich();
             }
 
             if(aktuellesZiel.typ === "panzer_fahrt" && panzerObjekt) {
@@ -3148,6 +3423,12 @@
                 rotationY=Math.atan2(panzerPosition.x-camera.position.x,panzerPosition.z-camera.position.z);
             }
             if(spieler.mission===4 && flugzeugObjekt){ camera.position.set(flugzeugObjekt.position.x-7,2.5,flugzeugObjekt.position.z); rotationY=flugzeugObjekt.rotation.y; }
+            if(spieler.mission===5 && flugzeugObjekt){
+                spielerImFlugzeug=true;
+                flugzeugHp=100;
+                camera.position.set(flugzeugObjekt.position.x-7,2.5,flugzeugObjekt.position.z);
+                rotationY=flugzeugObjekt.rotation.y;
+            }
             if(zielZone) {
                 scene.remove(zielZone);
                 zielZone = null;
@@ -3766,6 +4047,22 @@
                                     alert("Der Panzer wurde zerstört! Die Mission startet neu.");
                                     panzerObjekt.userData.hp=500;
                                     spieler.hp=100;
+                                    starteMission();
+                                    ausgebenUI();
+                                }
+                            } else if(spieler.mission===5 && spielerImFlugzeug){
+                                flugzeugHp=Math.max(0,flugzeugHp-damage);
+                                spieler.hp=flugzeugHp;
+                                playPlayerHitSound();
+                                ausgebenUI();
+
+                                if(flugzeugHp<=0){
+                                    flugzeugHp=100;
+                                    spieler.hp=100;
+                                    spielerImFlugzeug=false;
+                                    planeThrottleInput=0;
+                                    flugzeugGeschwindigkeit=0;
+                                    alert("Das Flugzeug wurde abgeschossen! Mission 5 startet neu.");
                                     starteMission();
                                     ausgebenUI();
                                 }
