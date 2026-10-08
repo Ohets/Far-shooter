@@ -473,6 +473,32 @@ function baueMission10Umstellung(){
         if(s){
             s.position.set(p[0],0,p[1]);
             szenerieGruppe.add(s);
+
+            const hp=105+(spieler.mission*28);
+            gegnerArray.push({
+                mesh:s,
+                material:s.userData.parts.uniformMat,
+                hp,maxHp:hp,
+                flashTimer:0,
+                attackCooldown:0.5+Math.random(),
+                animTime:Math.random()*10,
+                walkPhase:Math.random()*Math.PI*2,
+                dying:false,
+                deathTime:0,
+                muzzleTime:0,
+                shotCooldown:0.7+Math.random()*1.2,
+                verhalten:"verteidiger",
+                spawnPosition:s.position.clone(),
+                strafeDir:Math.random()<0.5?-1:1,
+                strafeTimer:1.5,
+                lastPlayerShot:0,
+                shootAnimTime:0,
+                shootRecoil:0,
+                entdeckt:true,
+                entdeckungsZeit:0,
+                schutzpunkt:s.position.clone(),
+                geiselWache:false
+            });
         }
     });
 }
