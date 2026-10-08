@@ -2359,7 +2359,7 @@
         }
 
         function aktualisierePanzerButton(){
-            const btn=document.getElementById('tank-btn');
+            const legacyBtn=document.getElementById('tank-btn');
             if(spieler.mission===7 && lastwagenObjekt){
                 if(spielerImLastwagen){
                     legacyBtn.style.display='block';
@@ -2373,7 +2373,6 @@
             }
             const hud=document.getElementById('hud');
             if(hud) hud.dataset.tankMode=spielerImPanzer ? '1' : '0';
-            const legacyBtn=document.getElementById('tank-btn');
             const scope=document.getElementById('tank-scope');
             if(scope) scope.style.display=spielerImPanzer ? 'block' : 'none';
             if(!legacyBtn) return;
