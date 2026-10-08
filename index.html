@@ -4058,6 +4058,12 @@ if(missionsNummer===8){
                 rotationY=lastwagenObjekt.rotation.y;
                 rotationX=0;
             }
+            if(spieler.mission===10){
+                // Start innerhalb des Hochhauses, direkt beim versteckten Safe.
+                camera.position.set(86,2,-84);
+                rotationY=Math.PI;
+                rotationX=0;
+            }
             if(spieler.mission===5 && flugzeugObjekt){
                 spielerImFlugzeug=true;
                 flugzeugHp=100;
