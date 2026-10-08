@@ -2655,6 +2655,7 @@
             if(missionsNummer===1 || missionsNummer===2 || missionsNummer===3) bauePanzerMission();
             if(missionsNummer===4) baueMission4Flugzeug();
             if(missionsNummer===6) baueMission6Atombombe();
+            if(missionsNummer===8) baueMission8GeheimenSchluessel();
             if(missionsNummer===3) baueMission3PanzerGebiet();
             if(daten.objekt === "geisel") baueGeiselSzenerie();
             if(daten.objekt === "verbuendete") baueVerbuendetenSzenerie();
@@ -3716,10 +3717,6 @@
                 baueMission6Atombombe();
                 baueMission7Lastwagen();
             }
-            if(spieler.mission===8){
-                baueMission8GeheimenSchluessel();
-            }
-
             if(spieler.mission===5){
                 baueMission4Flugzeug();
                 if(flugzeugObjekt){
