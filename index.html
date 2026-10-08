@@ -430,6 +430,68 @@
         let geheimerSchluesselGefunden=false;
 let geheimerSafeObjekt=null;
 let geheimerSafeGefunden=false;
+let dokumenteGesichert=false;
+let mission10FluchtZone=null;
+
+function baueMission10Fluchtzone(){
+    if(mission10FluchtZone && mission10FluchtZone.parent) mission10FluchtZone.parent.remove(mission10FluchtZone);
+
+    const zone=new THREE.Group();
+    const mat=new THREE.MeshLambertMaterial({color:0x1f7a35,emissive:0x0b2d12,transparent:true,opacity:0.8});
+    const ring=new THREE.Mesh(new THREE.CylinderGeometry(7,7,0.12,32),mat);
+    ring.position.y=0.06;
+    zone.add(ring);
+
+    const markerMat=new THREE.MeshBasicMaterial({color:0x58ff72});
+    const marker=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.18,4,8),markerMat);
+    marker.position.y=2;
+    zone.add(marker);
+
+    zone.position.set(86,0,-145);
+    szenerieGruppe.add(zone);
+    mission10FluchtZone=zone;
+}
+
+function baueMission10Umstellung(){
+    // Sehr viele Soldaten rund um das Hochhaus.
+    const punkte=[];
+    for(let i=0;i<18;i++){
+        const a=(i/18)*Math.PI*2;
+        punkte.push([86+Math.cos(a)*62, -92+Math.sin(a)*62]);
+    }
+    for(let i=0;i<12;i++){
+        punkte.push([35+i*9,-28]);
+        punkte.push([35+i*9,-156]);
+    }
+    for(let i=0;i<5;i++){
+        punkte.push([30,-55-i*22]);
+        punkte.push([142,-55-i*22]);
+    }
+
+    punkte.forEach(p=>{
+        const s=erstelleSoldat();
+        if(s){
+            s.position.set(p[0],0,p[1]);
+            szenerieGruppe.add(s);
+        }
+    });
+}
+
+function aktualisiereMission10(delta){
+    if(spieler.mission!==10 || !mission10FluchtZone || dokumenteGesichert) return;
+
+    mission10FluchtZone.rotation.y += delta*0.5;
+    const d=camera.position.distanceTo(mission10FluchtZone.position);
+
+    if(d<7){
+        dokumenteGesichert=true;
+        mission10FluchtZone.visible=false;
+        aktuellesZiel={typ:"dokumente_gesichert",name:"Dokumente sicher nach draußen gebracht!"};
+        ausgebenUI();
+        missionErfolgreich();
+    }
+}
+
 
 function baueMission9GeheimenSafe(){
     if(geheimerSafeObjekt && geheimerSafeObjekt.parent) geheimerSafeObjekt.parent.remove(geheimerSafeObjekt);
@@ -2673,6 +2735,79 @@ function aktualisiereGeheimenSafe(delta){
             // Mission 8 bekommt einen eigenen, stabilen Szenenaufbau.
             // So bleibt der Start unabhängig von den komplexeren Stadt-/Gebäudesystemen.
             
+
+if(missionsNummer===10){
+    const m10=missionsSzenerien[8];
+
+    // Exakt dieselbe Szenerie wie Mission 9.
+    scene.background=new THREE.Color(m10.himmel);
+    scene.fog=new THREE.FogExp2(m10.himmel,m10.nebel);
+    baueWachtuerme(10);
+
+    const boden=new THREE.Mesh(
+        new THREE.PlaneGeometry(520,520),
+        new THREE.MeshLambertMaterial({color:m10.boden})
+    );
+    boden.rotation.x=-Math.PI/2;
+    szenerieGruppe.add(boden);
+
+    const hochhaus=new THREE.Group();
+    const beton=new THREE.MeshLambertMaterial({color:0x62666a});
+    const fenster=new THREE.MeshLambertMaterial({color:0x253a4a,emissive:0x10202b});
+    const dachMat=new THREE.MeshLambertMaterial({color:0x36393c});
+
+    const turm=new THREE.Mesh(new THREE.BoxGeometry(42,72,42),beton);
+    turm.position.y=36;
+    hochhaus.add(turm);
+
+    for(let y=7;y<69;y+=8){
+        for(let x=-15;x<=15;x+=10){
+            const f1=new THREE.Mesh(new THREE.BoxGeometry(6,4.2,0.18),fenster);
+            f1.position.set(x,y,21.15);
+            hochhaus.add(f1);
+            const f2=f1.clone();
+            f2.position.z=-21.15;
+            hochhaus.add(f2);
+        }
+    }
+
+    for(let y=7;y<69;y+=8){
+        for(let z=-15;z<=15;z+=10){
+            const f1=new THREE.Mesh(new THREE.BoxGeometry(0.18,4.2,6),fenster);
+            f1.position.set(21.15,y,z);
+            hochhaus.add(f1);
+            const f2=f1.clone();
+            f2.position.x=-21.15;
+            hochhaus.add(f2);
+        }
+    }
+
+    const dach=new THREE.Mesh(new THREE.BoxGeometry(44,1.2,44),dachMat);
+    dach.position.y=72.5;
+    hochhaus.add(dach);
+
+    const eingang=new THREE.Mesh(
+        new THREE.BoxGeometry(8,6,0.5),
+        new THREE.MeshLambertMaterial({color:0x171b1e})
+    );
+    eingang.position.set(0,3,21.3);
+    hochhaus.add(eingang);
+
+    hochhaus.position.set(86,0,-92);
+    szenerieGruppe.add(hochhaus);
+
+    const versteck=new THREE.Mesh(
+        new THREE.BoxGeometry(9,4,4),
+        new THREE.MeshLambertMaterial({color:0x4b4d4f})
+    );
+    versteck.position.set(86,2,-68);
+    szenerieGruppe.add(versteck);
+
+    baueMission10Umstellung();
+    baueMission10Fluchtzone();
+    return;
+}
+
 if(missionsNummer===9){
     const m9=missionsSzenerien[8];
     scene.background=new THREE.Color(m9.himmel);
@@ -3703,6 +3838,8 @@ if(missionsNummer===8){
                 aktuellesZiel={typ:"geheimer_schluessel",name:"Finde den geheimen Schlüssel"};
             } else if(spieler.mission===9) {
                 aktuellesZiel={typ:"geheimer_safe",name:"Suche den versteckten Safe mit den geheimen Dokumenten"};
+            } else if(spieler.mission===10) {
+                aktuellesZiel={typ:"dokumente_flucht",name:"Bringe die Dokumente sicher nach draußen"};
             } else if(spieler.mission===11) {
                 aktuellesZiel={typ:"geisel",name:"Rette die Geisel – kein Alarm!"};
             } else if(spieler.mission===12) {
@@ -4705,6 +4842,7 @@ if(missionsNummer===8){
 
             aktualisiereGeheimenSchluessel(delta);
     aktualisiereGeheimenSafe(delta);
+    aktualisiereMission10(delta);
 
             // Mission 12: Verbündete werden fortlaufend aktualisiert.
             if(spieler.mission===12) updateVerbuendete(delta);
