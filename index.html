@@ -1973,7 +1973,7 @@
 
         function aktualisiereFlugzeugButton(){
             const btn=document.getElementById('plane-btn');
-            if(!btn || spieler.mission!==4 || !flugzeugObjekt){ if(btn) btn.style.display='none'; return; }
+            if(!btn || (spieler.mission!==4 && spieler.mission!==5) || !flugzeugObjekt){ if(btn) btn.style.display='none'; return; }
             const d=camera.position.distanceTo(flugzeugObjekt.position);
             btn.style.display='block';
             btn.textContent=spielerImFlugzeug ? 'AUSSTEIGEN' : 'FLUGZEUG EINSTEIGEN';
@@ -1982,6 +1982,7 @@
             if(throttle) throttle.style.display=spielerImFlugzeug ? 'block' : 'none';
             if(throttleLabel) throttleLabel.style.display=spielerImFlugzeug ? 'block' : 'none';
             if(spielerImFlugzeug) aktualisiereSchubAnzeige();
+            if(spieler.mission===5){ btn.style.display='none'; return; }
             if(!spielerImFlugzeug && d>=7) btn.style.display='none';
         }
 
@@ -2024,7 +2025,7 @@
         }
 
         function aktualisiereFlugzeug(delta){
-            if(spieler.mission!==4 || !flugzeugObjekt || !spielerImFlugzeug) return;
+            if((spieler.mission!==4 && spieler.mission!==5) || !flugzeugObjekt || !spielerImFlugzeug) return;
 
             // TURBOPROP-STYLE FLIGHT MODEL
             // Linker Stick: Rauf/Runter = Nase (Pitch), Links/Rechts = Querneigung (Roll)
