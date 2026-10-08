@@ -3453,6 +3453,29 @@
             verbuendeteArray.forEach(a=>scene.remove(a.mesh));
             verbuendeteArray=[];
             baueSzenerie(spieler.mission);
+
+            // Mission 5 kann auch direkt über das Missionsauswahl-Menü gestartet werden:
+            // Das Flugzeug ist sofort aktiv, die vollständige Flugsteuerung ist verfügbar
+            // und das Munitionslager wartet direkt als Ziel.
+            if(spieler.mission===5){
+                baueMission4Flugzeug();
+                if(flugzeugObjekt){
+                    flugzeugObjekt.position.set(0,24,25);
+                    flugzeugObjekt.rotation.set(0,Math.PI/2,0);
+                    flugzeugObjekt.visible=true;
+                    spielerImFlugzeug=true;
+                    flugzeugHp=100;
+                    flugzeugGeschwindigkeit=20;
+                    flugzeugVertikalGeschwindigkeit=0;
+                    flugzeugPitch=0;
+                    planeThrottleInput=0.35;
+                }
+                munitionslagerHp=3;
+                munitionslagerZerstoert=false;
+                raketenMunition=6;
+                baueMission5Munitionslager();
+            }
+
             geiselAlarm=false;
             const alarmBanner=document.getElementById('alarm-banner');
             if(alarmBanner) alarmBanner.style.display='none';
@@ -3463,6 +3486,13 @@
             if(spieler.mission===2 || spieler.mission===3){
                 camera.position.set(panzerPosition.x-6,2,panzerPosition.z+3);
                 rotationY=Math.atan2(panzerPosition.x-camera.position.x,panzerPosition.z-camera.position.z);
+            }
+            if(spieler.mission===5 && flugzeugObjekt){
+                spielerImFlugzeug=true;
+                flugzeugHp=100;
+                camera.position.set(flugzeugObjekt.position.x-7,2.5,flugzeugObjekt.position.z);
+                rotationY=flugzeugObjekt.rotation.y;
+                rotationX=0;
             }
             if(spieler.mission===4 && flugzeugObjekt){ camera.position.set(flugzeugObjekt.position.x-7,2.5,flugzeugObjekt.position.z); rotationY=flugzeugObjekt.rotation.y; }
             if(spieler.mission===5 && flugzeugObjekt){
@@ -3475,8 +3505,16 @@
                 scene.remove(zielZone);
                 zielZone = null;
             }
-            const gegnerAnzahl=(spieler.mission===4 || spieler.mission===11 || spieler.mission===2 || spieler.mission===3) ? 0 : Math.min(18,3+spieler.mission+Math.floor(spieler.mission/3));
+            const gegnerAnzahl=(spieler.mission===4 || spieler.mission===5 || spieler.mission===11 || spieler.mission===2 || spieler.mission===3) ? 0 : Math.min(18,3+spieler.mission+Math.floor(spieler.mission/3));
             erstelleGegner(gegnerAnzahl);
+
+            if(spieler.mission===5){
+                gegnerArray.length=0;
+                erstelleGegner(10);
+                for(const g of gegnerArray){
+                    g.schutzpunkt=new THREE.Vector3(0,0,-82);
+                }
+            }
             if(spieler.mission===11){
                 [[24,-40],[32,-40],[40,-40],[21,-30],[43,-30],[24,-20],[32,-20],[40,-20],[27,-25],[37,-25]]
                 .forEach((p,i)=>fuegeGeiselWacheHinzu(p[0],p[1],i));
@@ -3606,6 +3644,8 @@
             }
 
             neuesMissionsziel();
+            aktualisiereRaketenButton();
+            ausgebenUI();
         }
 
         function ausgebenUI() {
