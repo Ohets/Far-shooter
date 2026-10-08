@@ -468,9 +468,9 @@ function baueMission10Umstellung(){
         punkte.push([142,-55-i*22]);
     }
 
-    // Zusätzlicher aggressiver Ring direkt um die Flucht-Markierung.
-    for(let i=0;i<12;i++){
-        const a=(i/12)*Math.PI*2;
+    // Kompakter aggressiver Ring direkt um die Flucht-Markierung.
+    for(let i=0;i<6;i++){
+        const a=(i/6)*Math.PI*2;
         punkte.push([86+Math.cos(a)*18, -145+Math.sin(a)*18]);
     }
 
@@ -4115,7 +4115,7 @@ if(missionsNummer===8){
                 scene.remove(zielZone);
                 zielZone = null;
             }
-            const gegnerAnzahl=(spieler.mission===4 || spieler.mission===5 || spieler.mission===11 || spieler.mission===2 || spieler.mission===3) ? 0 : Math.min(18,3+spieler.mission+Math.floor(spieler.mission/3));
+            const gegnerAnzahl=(spieler.mission===4 || spieler.mission===5 || spieler.mission===10 || spieler.mission===11 || spieler.mission===2 || spieler.mission===3) ? 0 : Math.min(18,3+spieler.mission+Math.floor(spieler.mission/3));
             erstelleGegner(gegnerAnzahl);
 
             if(spieler.mission===5){
