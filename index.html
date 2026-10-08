@@ -3842,7 +3842,7 @@ if(missionsNummer===8){
                 const distanz=zielPunkt.distanceTo(punkt);
                 if(distanz<=radius){
                     const falloff=1-Math.min(distanz/radius,1);
-                    g.hp-=Math.round(120+260*falloff);
+                    g.hp-=Math.round(220+260*falloff);
                     g.flashTimer=0.16;
                     if(g.mesh.userData.parts && g.mesh.userData.parts.uniformMat){
                         g.mesh.userData.parts.uniformMat.color.setHex(0xffffff);
