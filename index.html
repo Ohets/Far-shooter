@@ -2608,6 +2608,42 @@
                 });
             }
 
+            // Mission 8 bekommt einen eigenen, stabilen Szenenaufbau.
+            // So bleibt der Start unabhängig von den komplexeren Stadt-/Gebäudesystemen.
+            if(missionsNummer===8){
+                const m8=missionsSzenerien[7];
+                scene.background=new THREE.Color(m8.himmel);
+                scene.fog=new THREE.FogExp2(m8.himmel,m8.nebel);
+
+                baueWachtuerme(8);
+
+                const m8boden=new THREE.Mesh(
+                    new THREE.PlaneGeometry(520,520),
+                    new THREE.MeshLambertMaterial({color:m8.boden})
+                );
+                m8boden.rotation.x=-Math.PI/2;
+                szenerieGruppe.add(m8boden);
+
+                // Einfache Ruinen als Deckung.
+                const m8Mat=new THREE.MeshLambertMaterial({color:0x45413e});
+                const m8Dark=new THREE.MeshLambertMaterial({color:0x2b2927});
+                const ruinen=[[ -42,-35,12,8,5 ],[ 38,-30,10,10,6 ],[ -35,35,14,8,5 ],[ 42,36,9,12,7 ],[ 5,55,12,8,4 ]];
+                ruinen.forEach(p=>{
+                    const g=new THREE.Group();
+                    const body=new THREE.Mesh(new THREE.BoxGeometry(p[2],p[4],p[3]),m8Mat);
+                    body.position.y=p[4]/2;
+                    g.add(body);
+                    const dach=new THREE.Mesh(new THREE.BoxGeometry(p[2]+0.4,0.35,p[3]+0.4),m8Dark);
+                    dach.position.y=p[4]+0.18;
+                    g.add(dach);
+                    g.position.set(p[0],0,p[1]);
+                    szenerieGruppe.add(g);
+                });
+
+                baueMission8GeheimenSchluessel();
+                return;
+            }
+
             const daten = missionsSzenerien[(missionsNummer - 1) % missionsSzenerien.length];
             const seed = missionsNummer * 7919;
             function zufall(i) {
