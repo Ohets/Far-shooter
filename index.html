@@ -426,6 +426,8 @@
         let spielerImLastwagen=false;
         let atombombeAufgeladen=false;
         let lastwagenZielZone=null;
+        let geheimerSchluesselObjekt=null;
+        let geheimerSchluesselGefunden=false;
 
         // Begehbare Gebäude: nur Wände blockieren den Spieler, die Türen bleiben offen.
         let weltKollisionsobjekte = [];
@@ -1758,6 +1760,65 @@
             beacon.position.y=3; safe.add(ring,beacon); safe.position.set(zielX,0,zielZ); szenerieGruppe.add(safe);
         }
 
+
+        function baueMission8GeheimenSchluessel(){
+            if(geheimerSchluesselObjekt && geheimerSchluesselObjekt.parent) geheimerSchluesselObjekt.parent.remove(geheimerSchluesselObjekt);
+
+            const key=new THREE.Group();
+
+            const gold=new THREE.MeshLambertMaterial({color:0xffd21f,emissive:0x6b5200});
+            const darkGold=new THREE.MeshLambertMaterial({color:0xb8860b,emissive:0x3a2500});
+
+            const ring=new THREE.Mesh(new THREE.TorusGeometry(0.65,0.16,10,20),gold);
+            ring.rotation.x=Math.PI/2;
+            ring.position.y=1.15;
+            key.add(ring);
+
+            const shaft=new THREE.Mesh(new THREE.BoxGeometry(0.22,1.65,0.22),gold);
+            shaft.position.y=0.25;
+            shaft.rotation.z=-0.08;
+            key.add(shaft);
+
+            const tooth1=new THREE.Mesh(new THREE.BoxGeometry(0.48,0.18,0.22),darkGold);
+            tooth1.position.set(0.20,-0.35,0);
+            tooth1.rotation.z=-0.08;
+            key.add(tooth1);
+
+            const tooth2=new THREE.Mesh(new THREE.BoxGeometry(0.35,0.18,0.22),darkGold);
+            tooth2.position.set(-0.05,-0.58,0);
+            tooth2.rotation.z=-0.08;
+            key.add(tooth2);
+
+            const glow=new THREE.Mesh(
+                new THREE.SphereGeometry(1.0,12,12),
+                new THREE.MeshBasicMaterial({color:0xffe46b,transparent:true,opacity:0.16})
+            );
+            glow.position.y=0.35;
+            key.add(glow);
+
+            key.position.set(72,0,-72);
+            key.userData.animTime=0;
+            szenerieGruppe.add(key);
+            geheimerSchluesselObjekt=key;
+            geheimerSchluesselGefunden=false;
+        }
+
+        function aktualisiereGeheimenSchluessel(delta){
+            if(spieler.mission!==8 || !geheimerSchluesselObjekt || geheimerSchluesselGefunden) return;
+
+            geheimerSchluesselObjekt.userData.animTime += delta;
+            geheimerSchluesselObjekt.rotation.y += delta * 1.4;
+            geheimerSchluesselObjekt.position.y = Math.sin(geheimerSchluesselObjekt.userData.animTime * 2.2) * 0.18;
+
+            const d=camera.position.distanceTo(geheimerSchluesselObjekt.position);
+            if(d < 4.5){
+                geheimerSchluesselGefunden=true;
+                geheimerSchluesselObjekt.visible=false;
+                aktuellesZiel={typ:"schluessel_gefunden",name:"Geheimer Schlüssel gefunden!"};
+                ausgebenUI();
+                missionErfolgreich();
+            }
+        }
 
         function baueMission6Atombombe(){
             if(atombombeObjekt && atombombeObjekt.parent) atombombeObjekt.parent.remove(atombombeObjekt);
@@ -3466,6 +3527,8 @@
                 aktuellesZiel={typ:"atombombe",name:"Finde die Atombombe"};
             } else if(spieler.mission===7) {
                 aktuellesZiel={typ:"atombombe_transport",name:"Steige in den Lastwagen ein und hole die Atombombe"};
+            } else if(spieler.mission===8) {
+                aktuellesZiel={typ:"geheimer_schluessel",name:"Finde den geheimen Schlüssel"};
             } else if(spieler.mission===11) {
                 aktuellesZiel={typ:"geisel",name:"Rette die Geisel – kein Alarm!"};
             } else if(spieler.mission===12) {
@@ -3587,6 +3650,10 @@
                 const d=lastwagenObjekt.position.distanceTo(lastwagenZielZone.position);
                 if(d<10) missionErfolgreich();
             }
+            if(aktuellesZiel.typ === "geheimer_schluessel"){
+                aktualisiereGeheimenSchluessel(delta);
+            }
+
             if(aktuellesZiel.typ === "panzer" && panzerObjekt) {
                 const d=camera.position.distanceTo(panzerPosition);
                 if(d<7.5) missionErfolgreich();
@@ -3631,6 +3698,8 @@
             spielerImLastwagen=false;
             atombombeAufgeladen=false;
             lastwagenZielZone=null;
+            geheimerSchluesselObjekt=null;
+            geheimerSchluesselGefunden=false;
             spielerImPanzer=false;
             panzerFahrbar=false;
             panzerTurm=null;
@@ -3646,6 +3715,9 @@
             if(spieler.mission===7){
                 baueMission6Atombombe();
                 baueMission7Lastwagen();
+            }
+            if(spieler.mission===8){
+                baueMission8GeheimenSchluessel();
             }
 
             if(spieler.mission===5){
@@ -4464,6 +4536,8 @@
                     }
                 }
             }
+
+            aktualisiereGeheimenSchluessel(delta);
 
             // Mission 12: Verbündete werden fortlaufend aktualisiert.
             if(spieler.mission===12) updateVerbuendete(delta);
