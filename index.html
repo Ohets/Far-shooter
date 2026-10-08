@@ -3507,7 +3507,17 @@
                     }, 50);
                 } else {
                     setTimeout(() => {
-                        alert("Mission " + alteMission + " abgeschlossen! +200$. Neues Missionsziel: " + (spieler.mission===11 ? "Geiselrettung" : spieler.mission===12 ? "Verbündetenoffensive" : missionsziele[(spieler.mission-1)%missionsziele.length].name) + ".");
+                        let naechstesZiel;
+                        if(spieler.mission===7){
+                            naechstesZiel="Bringe die Atombombe sicher nach draußen";
+                        } else if(spieler.mission===11){
+                            naechstesZiel="Rette die Geisel – kein Alarm!";
+                        } else if(spieler.mission===12){
+                            naechstesZiel="Gemeinsam vorrücken – eliminiert alle Gegner";
+                        } else {
+                            naechstesZiel=missionsziele[(spieler.mission-1)%missionsziele.length].name;
+                        }
+                        alert("Mission " + alteMission + " abgeschlossen! +200$. Neues Missionsziel: " + naechstesZiel + ".");
                         starteMission();
                     }, 50);
                 }
