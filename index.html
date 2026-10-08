@@ -20,6 +20,7 @@
         #look-stick { right: 40px; width: 100px; height: 100px; }
         #jump-btn { position: absolute; bottom: 245px; right: 55px; width: 64px; height: 64px; background: rgba(40,150,255,0.65); border-radius: 50%; display:flex; align-items:center; justify-content:center; font-size:14px; pointer-events:auto; z-index:4; }
         #fire-btn { position: absolute; bottom: 160px; right: 50px; width: 70px; height: 70px; background: rgba(255, 0, 0, 0.6); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; pointer-events: auto; }
+        #missile-btn { display:none; position:absolute; right:22px; bottom:122px; padding:11px 14px; background:rgba(155,45,45,0.92); border:2px solid #ff9b9b; color:white; border-radius:9px; font-weight:bold; font-size:13px; pointer-events:auto; touch-action:none; z-index:7; }
         #tank-scope { display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:170px; height:170px; border:2px solid rgba(255,255,255,.72); border-radius:50%; pointer-events:none; z-index:5; box-shadow:0 0 0 9999px rgba(0,0,0,.06); }
         #hud[data-tank-mode="1"] + #tank-scope { display:block; }
         #plane-throttle { display:none; position:absolute; left:155px; bottom:42px; width:34px; height:120px; border-radius:17px; background:rgba(20,25,30,0.72); border:2px solid rgba(180,220,255,0.75); pointer-events:auto; touch-action:none; z-index:7; }
@@ -74,6 +75,7 @@
     <div id="jump-btn" class="ui-element">SPRUNG</div>
     <div id="aim-btn">ZIELEN</div>
     <div id="fire-btn" class="ui-element">FEUER</div>
+    <div id="missile-btn" class="ui-element">🚀 RAKETE</div>
     <div id="tank-btn">PANZER EINSTEIGEN</div>
     <div id="plane-btn">FLUGZEUG EINSTEIGEN</div>
     <div id="plane-warning">⚠️ ACHTUNG ⚠️<br><span>Das Flugzeug hat eine geheime Steuerung.<br>Ich hoffe, du kannst damit fliegen!</span></div>
@@ -1862,6 +1864,12 @@
             munitionslagerZerstoert=false;
         }
 
+        function explosionBei(position,farbe){
+            const flash=new THREE.Mesh(new THREE.SphereGeometry(2.2,12,12),new THREE.MeshBasicMaterial({color:farbe,transparent:true,opacity:.9}));
+            flash.position.copy(position);szenerieGruppe.add(flash);let n=0;
+            function fade(){n++;flash.scale.multiplyScalar(1.08);flash.material.opacity=Math.max(0,.9-n/12);if(n<12)requestAnimationFrame(fade);else szenerieGruppe.remove(flash);}fade();
+        }
+
         function mission5Bombardieren(){
             if(spieler.mission!==5 || !spielerImFlugzeug || munitionslagerZerstoert) return;
 
@@ -1968,6 +1976,7 @@
             mission4UebergangAktiv=false;
             missionAbgeschlossen=false;
             munitionslagerHp=3;
+            raketenMunition=6;
             baueMission5Munitionslager();
 
             aktuellesZiel={
@@ -2041,6 +2050,7 @@
 
         function aktualisiereFlugzeug(delta){
             if((spieler.mission!==4 && spieler.mission!==5) || !flugzeugObjekt || !spielerImFlugzeug) return;
+        aktualisiereRaketenButton();
 
             // TURBOPROP-STYLE FLIGHT MODEL
             // Linker Stick: Rauf/Runter = Nase (Pitch), Links/Rechts = Querneigung (Roll)
@@ -3077,6 +3087,11 @@
             e.stopPropagation();
         }, {passive:false});
 
+        const missileBtn=document.getElementById('missile-btn');
+        missileBtn.style.touchAction='none';
+        missileBtn.addEventListener('touchstart',(e)=>{e.preventDefault();e.stopPropagation();feuereRakete();},{passive:false});
+        missileBtn.addEventListener('touchmove',(e)=>{e.preventDefault();e.stopPropagation();},{passive:false});
+
         function zeigePanzerplattenTreffer(objekt){
             if(!objekt || !objekt.parent) return;
 
@@ -3134,6 +3149,33 @@
                 }
             };
             tick();
+        }
+
+        let raketenMunition=6;
+        function aktualisiereRaketenButton(){
+            if(!missileBtn)return;
+            const sichtbar=spielerImFlugzeug&&spieler.mission===5&&!missionAbgeschlossen;
+            missileBtn.style.display=sichtbar?'block':'none';
+            missileBtn.textContent='🚀 RAKETE ('+raketenMunition+')';
+        }
+        function feuereRakete(){
+            if(!spielerImFlugzeug||spieler.mission!==5||!flugzeugObjekt||munitionslagerZerstoert||raketenMunition<=0)return;
+            raketenMunition--;aktualisiereRaketenButton();playShootSound();
+            const rocket=new THREE.Mesh(new THREE.CylinderGeometry(.18,.18,1.7,8),new THREE.MeshBasicMaterial({color:0xd8d8d8}));
+            rocket.rotation.z=Math.PI/2;rocket.position.copy(flugzeugObjekt.position);rocket.position.y=Math.max(2,rocket.position.y-1);szenerieGruppe.add(rocket);
+            const direction=new THREE.Vector3(1,0,0).applyQuaternion(flugzeugObjekt.quaternion).normalize();let frames=0;
+            function tick(){
+                if(!rocket.parent)return;
+                rocket.position.addScaledVector(direction,4.8);frames++;
+                if(munitionslagerObjekt&&Math.hypot(rocket.position.x-munitionslagerObjekt.x,rocket.position.z-munitionslagerObjekt.z)<14&&rocket.position.y<20){
+                    munitionslagerHp=Math.max(0,munitionslagerHp-1);explosionBei(rocket.position,0xff6a33);
+                    if(munitionslagerHp<=0){munitionslagerZerstoert=true;if(munitionslagerObjekt.ring)munitionslagerObjekt.ring.visible=false;if(munitionslagerObjekt.beacon)munitionslagerObjekt.beacon.visible=false;if(munitionslagerObjekt.zielKegel)munitionslagerObjekt.zielKegel.visible=false;if(munitionslagerObjekt.label)munitionslagerObjekt.label.visible=false;missionErfolgreich();}
+                    szenerieGruppe.remove(rocket);return;
+                }
+                for(const g of gegnerArray){if(g&&g.mesh&&g.mesh.parent&&rocket.position.distanceTo(g.mesh.position)<4){g.mesh.visible=false;g.hp=0;explosionBei(rocket.position,0xffaa33);szenerieGruppe.remove(rocket);return;}}
+                if(frames>1800||Math.abs(rocket.position.x)>420||Math.abs(rocket.position.z)>420||rocket.position.y<-2||rocket.position.y>220){szenerieGruppe.remove(rocket);return;}
+                requestAnimationFrame(tick);
+            }tick();
         }
 
         function feuerWaffe() {
