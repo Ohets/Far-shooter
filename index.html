@@ -1921,28 +1921,22 @@
         }
 
         function mission4AbschlussBereitFuer5(){
-            if(mission4UebergangAktiv) return;
-            mission4UebergangAktiv=true;
+            if(missionAbgeschlossen) return;
 
-            // Mission 4 ist abgeschlossen. Das gleiche Flugzeug bleibt erhalten
-            // und Mission 5 startet sofort in der Luft.
-            missionAbgeschlossen=true;
-            spieler.credits+=200;
-            spieler.mission=5;
-
-            oeffneMission5AusFlugzeug();
-            ausgebenUI();
+            // Mission 4 wird exakt wie die anderen Missionen abgeschlossen.
+            // Danach übernimmt die normale Missionsfortsetzung und startet Mission 5.
+            missionErfolgreich();
         }
 
         function oeffneMission5AusFlugzeug(){
-            if(!mission4UebergangAktiv || spieler.mission!==5 || !flugzeugObjekt || !mission4UebergangMarker) return;
+            if(!mission4UebergangAktiv || spieler.mission!==5 || !flugzeugObjekt) return;
 
             const plane=flugzeugObjekt;
             const planePosition=plane.position.clone();
             const planeRotation=plane.rotation.clone();
 
             if(plane.parent) plane.parent.remove(plane);
-            if(mission4UebergangMarker.parent) mission4UebergangMarker.parent.remove(mission4UebergangMarker);
+            if(mission4UebergangMarker && mission4UebergangMarker.parent) mission4UebergangMarker.parent.remove(mission4UebergangMarker);
             mission4UebergangMarker=null;
 
             baueSzenerie(5);
@@ -3311,10 +3305,22 @@
 
             if(spieler.mission < missionsSzenerien.length) {
                 spieler.mission++;
-                setTimeout(() => {
-                    alert("Mission " + alteMission + " abgeschlossen! +200$. Neues Missionsziel: " + (spieler.mission===11 ? "Geiselrettung" : spieler.mission===12 ? "Verbündetenoffensive" : missionsziele[(spieler.mission-1)%missionsziele.length].name) + ".");
-                    starteMission();
-                }, 50);
+
+                if(alteMission===4 && flugzeugObjekt){
+                    // Mission 4 wird normal als abgeschlossen angezeigt, aber das
+                    // Flugzeug bleibt erhalten und Mission 5 startet anschließend
+                    // direkt mit demselben Flugzeug.
+                    mission4UebergangAktiv=true;
+                    setTimeout(() => {
+                        alert("Mission " + alteMission + " abgeschlossen! +200$. Neues Missionsziel: " + missionsziele[(spieler.mission-1)%missionsziele.length].name + ".");
+                        oeffneMission5AusFlugzeug();
+                    }, 50);
+                } else {
+                    setTimeout(() => {
+                        alert("Mission " + alteMission + " abgeschlossen! +200$. Neues Missionsziel: " + (spieler.mission===11 ? "Geiselrettung" : spieler.mission===12 ? "Verbündetenoffensive" : missionsziele[(spieler.mission-1)%missionsziele.length].name) + ".");
+                        starteMission();
+                    }, 50);
+                }
             } else {
                 setTimeout(() => {
                     alert("Glückwunsch! Alle 12 Missionen geschafft! +200$. Die Kampagne beginnt erneut.");
