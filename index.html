@@ -2213,10 +2213,11 @@
                     flugzeugVertikalGeschwindigkeit=0;
             }
 
+            const flugzeugGrenze = spieler.mission===5 ? 390 : 245;
             flugzeugObjekt.position.x=
-                THREE.MathUtils.clamp(flugzeugObjekt.position.x,-245,245);
+                THREE.MathUtils.clamp(flugzeugObjekt.position.x,-flugzeugGrenze,flugzeugGrenze);
             flugzeugObjekt.position.z=
-                THREE.MathUtils.clamp(flugzeugObjekt.position.z,-245,245);
+                THREE.MathUtils.clamp(flugzeugObjekt.position.z,-flugzeugGrenze,flugzeugGrenze);
 
             // --- CHASE CAMERA ---
             const cameraTarget=flugzeugObjekt.position.clone().add(
@@ -2407,8 +2408,9 @@
             // Taktische Wachtürme auf jeder Mission.
             if(missionsNummer!==4) baueWachtuerme(missionsNummer);
 
+            const floorSize = missionsNummer===5 ? 800 : 520;
             const floor = new THREE.Mesh(
-                new THREE.PlaneGeometry(520, 520),
+                new THREE.PlaneGeometry(floorSize, floorSize),
                 new THREE.MeshLambertMaterial({color:daten.boden})
             );
             floor.rotation.x = -Math.PI / 2;
