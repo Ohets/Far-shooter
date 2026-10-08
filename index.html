@@ -2443,15 +2443,16 @@
                 rotationX += lookInput.y * delta * 1.25;
                 rotationX=Math.max(-0.65,Math.min(0.5,rotationX));
 
-                const sitzOffset=new THREE.Vector3(0,3.8,7.0);
+                const sitzOffset=new THREE.Vector3(0,4.2,-10.0);
                 sitzOffset.applyAxisAngle(new THREE.Vector3(0,1,0),lastwagenObjekt.rotation.y);
                 camera.position.copy(lastwagenObjekt.position).add(sitzOffset);
-                camera.position.y=3.8;
+                camera.position.y=4.2;
 
+                // Blickrichtung folgt der Fahrtrichtung des Lastwagens.
                 const sichtRichtung=new THREE.Vector3(
-                    Math.sin(rotationY)*Math.cos(rotationX),
+                    -Math.sin(rotationY)*Math.cos(rotationX),
                     Math.sin(rotationX),
-                    Math.cos(rotationY)*Math.cos(rotationX)
+                    -Math.cos(rotationY)*Math.cos(rotationX)
                 );
                 const sichtZiel=lastwagenObjekt.position.clone().addScaledVector(sichtRichtung,30);
                 sichtZiel.y+=2.0;
