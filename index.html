@@ -21,6 +21,7 @@
         #jump-btn { position: absolute; bottom: 245px; right: 55px; width: 64px; height: 64px; background: rgba(40,150,255,0.65); border-radius: 50%; display:flex; align-items:center; justify-content:center; font-size:14px; pointer-events:auto; z-index:4; }
         #fire-btn { position: absolute; bottom: 160px; right: 50px; width: 70px; height: 70px; background: rgba(255, 0, 0, 0.6); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; pointer-events: auto; }
         #missile-btn { display:none; position:absolute; right:22px; bottom:122px; padding:11px 14px; background:rgba(155,45,45,0.92); border:2px solid #ff9b9b; color:white; border-radius:9px; font-weight:bold; font-size:13px; pointer-events:auto; touch-action:none; z-index:7; }
+        #grenade-btn { position:absolute; right:22px; bottom:205px; padding:11px 14px; background:rgba(80,80,80,0.92); border:2px solid #d8d8d8; color:white; border-radius:9px; font-weight:bold; font-size:13px; pointer-events:auto; touch-action:none; z-index:7; }
         #tank-scope { display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:170px; height:170px; border:2px solid rgba(255,255,255,.72); border-radius:50%; pointer-events:none; z-index:5; box-shadow:0 0 0 9999px rgba(0,0,0,.06); }
         #hud[data-tank-mode="1"] + #tank-scope { display:block; }
         #plane-throttle { display:none; position:absolute; left:155px; bottom:42px; width:34px; height:120px; border-radius:17px; background:rgba(20,25,30,0.72); border:2px solid rgba(180,220,255,0.75); pointer-events:auto; touch-action:none; z-index:7; }
@@ -59,6 +60,7 @@
     <div id="hud" class="ui-element">
         Leben: <span id="hp-val">100</span> | Credits: <span id="credits-val">0</span>$<br>
         Waffe: <span id="weapon-val">Pistole</span><br>
+        Granaten: <span id="grenade-val">3</span><br>
         <span id="cover-status"></span>
     </div>
     
@@ -76,6 +78,7 @@
     <div id="aim-btn">ZIELEN</div>
     <div id="fire-btn" class="ui-element">FEUER</div>
     <div id="missile-btn" class="ui-element">🚀 RAKETE</div>
+    <div id="grenade-btn" class="ui-element">💣 GRANATE <span id="grenade-btn-count">3</span></div>
     <div id="tank-btn">PANZER EINSTEIGEN</div>
     <div id="plane-btn">FLUGZEUG EINSTEIGEN</div>
     <div id="plane-warning">⚠️ ACHTUNG ⚠️<br><span>Das Flugzeug hat eine geheime Steuerung.<br>Ich hoffe, du kannst damit fliegen!</span></div>
@@ -276,10 +279,16 @@
             { id: 1, name: "Schrotflinte", schaden: 60, preis: 150, gekauft: false },
             { id: 2, name: "Sturmgewehr AK", schaden: 40, preis: 300, gekauft: false },
             { id: 3, name: "Scharfschützengewehr", schaden: 120, preis: 600, gekauft: false },
-            { id: 4, name: "Plasma-Werfer", schaden: 200, preis: 1200, gekauft: false }
+            { id: 4, name: "Plasma-Werfer", schaden: 200, preis: 1200, gekauft: false },
+            { id: 5, name: "MP5", schaden: 32, preis: 450, gekauft: false },
+            { id: 6, name: "LMG", schaden: 55, preis: 800, gekauft: false },
+            { id: 7, name: "Revolver", schaden: 85, preis: 950, gekauft: false },
+            { id: 8, name: "Railgun", schaden: 300, preis: 1800, gekauft: false }
         ];
         
         let aktuelleWaffe = waffenListe[0];
+        let granaten = 3;
+        const maxGranaten = 6;
         let zielenAktiv = false;
         const normaleFov = 75;
         const zielFov = 42;
@@ -3692,6 +3701,18 @@ if(missionsNummer===8){
             e.stopPropagation();
         }, {passive:false});
 
+        const grenadeBtn=document.getElementById('grenade-btn');
+        grenadeBtn.style.touchAction='none';
+        grenadeBtn.addEventListener('touchstart',(e)=>{
+            e.preventDefault();
+            e.stopPropagation();
+            wirfGranate();
+        },{passive:false});
+        grenadeBtn.addEventListener('touchmove',(e)=>{
+            e.preventDefault();
+            e.stopPropagation();
+        },{passive:false});
+
         const missileBtn=document.getElementById('missile-btn');
         missileBtn.style.touchAction='none';
         missileBtn.addEventListener('touchstart',(e)=>{e.preventDefault();e.stopPropagation();feuereRakete();},{passive:false});
@@ -3781,6 +3802,74 @@ if(missionsNummer===8){
                 if(frames>1800||Math.abs(rocket.position.x)>420||Math.abs(rocket.position.z)>420||rocket.position.y<-2||rocket.position.y>220){szenerieGruppe.remove(rocket);return;}
                 requestAnimationFrame(tick);
             }tick();
+        }
+
+        function wirfGranate() {
+            if(spielerImFlugzeug || spielerImPanzer || spielerImLastwagen) return;
+            if(granaten <= 0) return;
+
+            granaten--;
+            playShootSound();
+
+            const raycaster=new THREE.Raycaster();
+            raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
+            const treffer=raycaster.intersectObjects(scene.children,true);
+
+            let punkt=null;
+            for(const hit of treffer){
+                if(hit.object.userData && hit.object.userData.noGrenadeTarget) continue;
+                punkt=hit.point.clone();
+                break;
+            }
+
+            if(!punkt){
+                const richtung=new THREE.Vector3();
+                camera.getWorldDirection(richtung);
+                punkt=camera.position.clone().addScaledVector(richtung,18);
+                punkt.y=Math.max(0.5,punkt.y);
+            }
+
+            const radius=8;
+            for(const g of gegnerArray){
+                if(!g || g.dying || !g.mesh) continue;
+                const zielPunkt=g.mesh.position.clone();
+                zielPunkt.y+=1.2;
+                const distanz=zielPunkt.distanceTo(punkt);
+                if(distanz<=radius){
+                    const falloff=1-Math.min(distanz/radius,1);
+                    g.hp-=Math.round(120+260*falloff);
+                    g.flashTimer=0.16;
+                    if(g.mesh.userData.parts && g.mesh.userData.parts.uniformMat){
+                        g.mesh.userData.parts.uniformMat.color.setHex(0xffffff);
+                    }
+                    if(g.hp<=0 && !g.dying){
+                        g.dying=true;
+                        g.deathTime=0;
+                        g.mesh.userData.deathAwarded=false;
+                    }
+                }
+            }
+
+            const explosion=new THREE.Mesh(
+                new THREE.SphereGeometry(0.8,12,10),
+                new THREE.MeshBasicMaterial({color:0xffb347,transparent:true,opacity:0.9})
+            );
+            explosion.position.copy(punkt);
+            scene.add(explosion);
+            const start=performance.now();
+            const tick=()=>{
+                const t=Math.min((performance.now()-start)/300,1);
+                explosion.scale.setScalar(1+t*7);
+                explosion.material.opacity=0.9*(1-t);
+                if(t<1) requestAnimationFrame(tick);
+                else {
+                    scene.remove(explosion);
+                    explosion.geometry.dispose();
+                    explosion.material.dispose();
+                }
+            };
+            tick();
+            ausgebenUI();
         }
 
         function feuerWaffe() {
@@ -4349,6 +4438,9 @@ if(missionsNummer===8){
             document.getElementById('credits-val').innerText = spieler.credits;
             document.getElementById('weapon-val').innerText = aktuelleWaffe.name;
             document.getElementById('cover-status').innerText = spielerIstInGebaeude() ? '🛡️ IN DECKUNG' : '';
+            document.getElementById('grenade-val').innerText = granaten;
+            const grenadeCount=document.getElementById('grenade-btn-count');
+            if(grenadeCount) grenadeCount.innerText=granaten;
             document.getElementById('mission-num').innerText = spieler.mission;
             aktualisierePanzerButton();
             if(aktuellesZiel) {
