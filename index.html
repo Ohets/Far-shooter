@@ -3602,6 +3602,11 @@
         }
 
         function starteMission() {
+            // Jede neue Mission muss wieder als aktiv gelten.
+            // Ohne Reset bleibt missionAbgeschlossen nach der vorherigen Mission
+            // auf true und die Missionsprüfung von Level 7 wird sofort übersprungen.
+            missionAbgeschlossen = false;
+            aktuellesZiel = null;
             if(geiselObjekt){scene.remove(geiselObjekt);geiselObjekt=null;}
             if(panzerObjekt){scene.remove(panzerObjekt);panzerObjekt=null;}
             flugzeugObjekt=null; spielerImFlugzeug=false; flugzeugGeschwindigkeit=0; flugzeugPitch=0;
