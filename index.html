@@ -95,8 +95,13 @@
 
     <div id="shop-menu">
         <button class="close-btn" onclick="toggleShop()">X Schließen</button>
-        <h2>Waffenschrank (Erkaufbare Upgrades)</h2>
+        <h2>Waffenschrank &amp; Granaten-Shop</h2>
         <div id="shop-list"></div>
+        <div class="shop-item">
+            <span><b>💣 Granate</b> (max. 6 Stück)</span>
+            <span><span id="shop-grenade-info">3/6</span> 
+            <button class="buy-btn" onclick="kaufeGranaten()">+1 für 100$</button></span>
+        </div>
     </div>
 
     <script>
@@ -4439,6 +4444,8 @@ if(missionsNummer===8){
             document.getElementById('weapon-val').innerText = aktuelleWaffe.name;
             document.getElementById('cover-status').innerText = spielerIstInGebaeude() ? '🛡️ IN DECKUNG' : '';
             document.getElementById('grenade-val').innerText = granaten;
+            const shopGrenadeInfo = document.getElementById('shop-grenade-info');
+            if(shopGrenadeInfo) shopGrenadeInfo.innerText = granaten + '/' + maxGranaten;
             const grenadeCount=document.getElementById('grenade-btn-count');
             if(grenadeCount) grenadeCount.innerText=granaten;
             document.getElementById('mission-num').innerText = spieler.mission;
@@ -4507,6 +4514,21 @@ if(missionsNummer===8){
                 `;
                 list.appendChild(div);
             });
+        }
+
+        window.kaufeGranaten = function() {
+            if(granaten >= maxGranaten) {
+                alert("Du kannst maximal 6 Granaten tragen!");
+                return;
+            }
+            if(spieler.credits >= 100) {
+                spieler.credits -= 100;
+                granaten++;
+                ausgebenUI();
+                renderShop();
+            } else {
+                alert("Nicht genug Credits!");
+            }
         }
 
         window.kaufeWaffe = function(id) {
