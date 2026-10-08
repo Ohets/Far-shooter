@@ -1762,7 +1762,7 @@
             if(camera.position.distanceTo(flugzeugObjekt.position)>7) return;
             spielerImFlugzeug=true;
             moveInput={x:0,y:0}; lookInput={x:0,y:0};
-            flugzeugPitch=0; flugzeugGeschwindigkeit=0; flugzeugVertikalGeschwindigkeit=0; flugzeugObjekt.rotation.z=0;
+            flugzeugPitch=0; flugzeugGeschwindigkeit=0; flugzeugVertikalGeschwindigkeit=0; flugzeugObjekt.rotation.x=0; flugzeugObjekt.rotation.z=0;
             planeThrottleInput=0.18;
             const startQ=new THREE.Quaternion().setFromEuler(new THREE.Euler(0,flugzeugObjekt.rotation.y,0,'YXZ'));
             camera.position.copy(flugzeugObjekt.position).add(new THREE.Vector3(-12,4.8,0).applyQuaternion(startQ));
@@ -1774,7 +1774,7 @@
             if(spieler.mission!==4 || !flugzeugObjekt || !spielerImFlugzeug) return;
 
             // TURBOPROP-STYLE FLIGHT MODEL
-            // Linker Stick: Pitch + Roll
+            // Linker Stick: Rauf/Runter = Nase (Pitch), Links/Rechts = Querneigung (Roll)
             // Rechter Stick: Rudder/Yaw
             // SCHUB: Motorleistung
             const deadZone=0.08;
@@ -1810,7 +1810,8 @@
             }
 
             // --- STEUERUNG ---
-            // Pitch reagiert langsam und hat Selbstzentrierung.
+            // Rauf/Runter am linken Stick steuert die Nase.
+            // Links/Rechts steuert ausschließlich die Querneigung.
             const pitchRate=0.78;
             flugzeugPitch += pitchInput*pitchRate*delta;
 
@@ -1825,14 +1826,14 @@
             // Roll wie bei einem kleinen Turboprop: Stick erzeugt Bank,
             // Loslassen richtet das Flugzeug langsam wieder auf.
             const targetBank=-rollInput*0.72;
-            flugzeugObjekt.rotation.z=THREE.MathUtils.lerp(
-                flugzeugObjekt.rotation.z,
+            flugzeugObjekt.rotation.x=THREE.MathUtils.lerp(
+                flugzeugObjekt.rotation.x,
                 targetBank,
                 Math.min(1,delta*(3.5+controlAuthority*4))
             );
 
             // Gekoppelte Kurve + Seitenruder.
-            const bankTurn=Math.sin(flugzeugObjekt.rotation.z)*
+            const bankTurn=Math.sin(flugzeugObjekt.rotation.x)*
                 (0.18+Math.min(speed/35,1)*0.62);
             const yawRate=
                 bankTurn*controlAuthority+
@@ -1845,7 +1846,7 @@
                 new THREE.Euler(
                     flugzeugPitch,
                     flugzeugObjekt.rotation.y,
-                    flugzeugObjekt.rotation.z,
+                    flugzeugObjekt.rotation.x,
                     'YXZ'
                 )
             );
