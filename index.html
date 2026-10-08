@@ -503,7 +503,8 @@ function baueMission10Umstellung(){
                 entdeckt:true,
                 entdeckungsZeit:0,
                 schutzpunkt:null,
-                geiselWache:false
+                geiselWache:false,
+                mission10Wache:true
             });
         }
     });
@@ -4680,7 +4681,9 @@ if(missionsNummer===8){
                 spielerZielFuerSchuss.y = 1.4;
                 const schussSicht = istSichtkontakt(soldatAugeFuerSchuss, spielerZielFuerSchuss);
 
-                if(g.entdeckt && dist < schussReichweite && schussSicht && !spielerIstImGebaeudeGeschuetzt()) {
+                if(g.entdeckt && dist < schussReichweite &&
+                   (schussSicht || g.mission10Wache) &&
+                   !spielerIstImGebaeudeGeschuetzt()) {
                     if(g.festerPosten) {
                         // Scharfschütze: stabile Anschlagshaltung mit leichtem Atem-/Zielwackeln.
                         const atem = Math.sin(g.animTime * 1.8 + g.turmIndex) * 0.025;
