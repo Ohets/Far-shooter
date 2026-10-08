@@ -2362,34 +2362,34 @@
             const btn=document.getElementById('tank-btn');
             if(spieler.mission===7 && lastwagenObjekt){
                 if(spielerImLastwagen){
-                    btn.style.display='block';
-                    btn.textContent='AUSSTEIGEN';
+                    legacyBtn.style.display='block';
+                    legacyBtn.textContent='AUSSTEIGEN';
                 } else {
                     const d=camera.position.distanceTo(lastwagenObjekt.position);
-                    btn.style.display=d<7 ? 'block' : 'none';
-                    btn.textContent='🚚 LASTWAGEN EINSTEIGEN';
+                    legacyBtn.style.display=d<7 ? 'block' : 'none';
+                    legacyBtn.textContent='🚚 LASTWAGEN EINSTEIGEN';
                 }
                 return;
             }
             const hud=document.getElementById('hud');
             if(hud) hud.dataset.tankMode=spielerImPanzer ? '1' : '0';
-            const btn=document.getElementById('tank-btn');
+            const legacyBtn=document.getElementById('tank-btn');
             const scope=document.getElementById('tank-scope');
             if(scope) scope.style.display=spielerImPanzer ? 'block' : 'none';
-            if(!btn) return;
+            if(!legacyBtn) return;
             if((spieler.mission!==2 && spieler.mission!==3) || !panzerObjekt){
-                btn.style.display='none';
+                legacyBtn.style.display='none';
                 return;
             }
             const d=camera.position.distanceTo(panzerObjekt.position);
             if(spielerImPanzer){
-                btn.style.display='block';
-                btn.textContent='AUSSTEIGEN';
+                legacyBtn.style.display='block';
+                legacyBtn.textContent='AUSSTEIGEN';
             } else if(d<6.5){
-                btn.style.display='block';
-                btn.textContent='PANZER EINSTEIGEN';
+                legacyBtn.style.display='block';
+                legacyBtn.textContent='PANZER EINSTEIGEN';
             } else {
-                btn.style.display='none';
+                legacyBtn.style.display='none';
             }
         }
 
