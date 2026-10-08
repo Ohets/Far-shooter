@@ -1054,7 +1054,13 @@ function aktualisiereGeheimenSafe(delta){
             {name:"Ruinenstadt", boden:0x55534e, himmel:0x6b7074, nebel:0.009, objekt:"stadt"},
             {name:"Nachtbasis", boden:0x17251e, himmel:0x101a25, nebel:0.012, objekt:"nacht"},
             {name:"Geiselrettung", boden:0x202820, himmel:0x182026, nebel:0.013, objekt:"geisel"},
-            {name:"Verbündetenoffensive", boden:0x3d4939, himmel:0x61727b, nebel:0.009, objekt:"verbuendete"}
+            {name:"Verbündetenoffensive", boden:0x3d4939, himmel:0x61727b, nebel:0.009, objekt:"verbuendete"},
+            {name:"Feindliches Depot", boden:0x45483f, himmel:0x58636a, nebel:0.009, objekt:"nacht"},
+            {name:"Versorgungsroute", boden:0x5b5548, himmel:0x7a8180, nebel:0.008, objekt:"fels"},
+            {name:"Gegenangriff", boden:0x303b32, himmel:0x59676c, nebel:0.011, objekt:"wald"},
+            {name:"Panzerwerk", boden:0x45413c, himmel:0x596067, nebel:0.009, objekt:"stadt"},
+            {name:"Letzter Flugplatz", boden:0x4b504b, himmel:0x66717a, nebel:0.007, objekt:"kueste"},
+            {name:"Festung des Big Boss", boden:0x25282a, himmel:0x353a42, nebel:0.014, objekt:"nacht"}
         ];
 
 
@@ -2745,7 +2751,27 @@ function aktualisiereGeheimenSafe(delta){
             }
         }
 
-        function baueSzenerie(missionsNummer) {
+        function baueMission18BigBoss(){
+    const boss=erstelleSoldat();
+    if(!boss) return;
+    boss.position.set(112,0,-118);
+    boss.scale.set(2.1,2.1,2.1);
+    szenerieGruppe.add(boss);
+
+    const hp=1800;
+    gegnerArray.push({
+        mesh:boss, material:boss.userData.parts.uniformMat,
+        hp,maxHp:hp, flashTimer:0, attackCooldown:0.3,
+        animTime:0, walkPhase:0, dying:false, deathTime:0, muzzleTime:0,
+        shotCooldown:0.45, verhalten:"angreifer",
+        spawnPosition:boss.position.clone(), strafeDir:1, strafeTimer:1.2,
+        lastPlayerShot:0, shootAnimTime:0, shootRecoil:0,
+        entdeckt:true, entdeckungsZeit:0, schutzpunkt:null,
+        geiselWache:false, mission10Wache:false, istBigBoss:true
+    });
+}
+
+function baueSzenerie(missionsNummer) {
             // Beim Wechsel der Mission alte Etagen-Bodeninformationen entfernen.
             hochhausEtagenBoeden = [];
             weltKollisionsobjekte = [];
@@ -2768,6 +2794,42 @@ function aktualisiereGeheimenSafe(delta){
             // Mission 8 bekommt einen eigenen, stabilen Szenenaufbau.
             // So bleibt der Start unabhängig von den komplexeren Stadt-/Gebäudesystemen.
             
+
+if(missionsNummer===18){
+    const m18=missionsSzenerien[17];
+    scene.background=new THREE.Color(m18.himmel);
+    scene.fog=new THREE.FogExp2(m18.himmel,m18.nebel);
+
+    const boden=new THREE.Mesh(new THREE.PlaneGeometry(520,520),
+        new THREE.MeshLambertMaterial({color:m18.boden}));
+    boden.rotation.x=-Math.PI/2;
+    szenerieGruppe.add(boden);
+
+    const festung=new THREE.Group();
+    const mauerMat=new THREE.MeshLambertMaterial({color:0x303236});
+    const torMat=new THREE.MeshLambertMaterial({color:0x17191c});
+    const turmMat=new THREE.MeshLambertMaterial({color:0x3e4247});
+
+    const hauptbau=new THREE.Mesh(new THREE.BoxGeometry(58,18,42),mauerMat);
+    hauptbau.position.y=9;
+    festung.add(hauptbau);
+
+    const tor=new THREE.Mesh(new THREE.BoxGeometry(12,9,0.8),torMat);
+    tor.position.set(0,4.5,21.3);
+    festung.add(tor);
+
+    [[-25,-16],[25,-16],[-25,16],[25,16]].forEach(p=>{
+        const t=new THREE.Mesh(new THREE.BoxGeometry(7,25,7),turmMat);
+        t.position.set(p[0],12.5,p[1]);
+        festung.add(t);
+    });
+
+    festung.position.set(112,0,-118);
+    szenerieGruppe.add(festung);
+    baueWachtuerme(18);
+    baueMission18BigBoss();
+    return;
+}
 
 if(missionsNummer===10){
     const m10=missionsSzenerien[8];
@@ -3877,6 +3939,18 @@ if(missionsNummer===8){
                 aktuellesZiel={typ:"geisel",name:"Befreie die Geisel aber gib ihnen die Dokumente nicht zurück!"};
             } else if(spieler.mission===12) {
                 aktuellesZiel={typ:"verbuendete",name:"Gemeinsam vorrücken – eliminiert alle Gegner"};
+            } else if(spieler.mission===13) {
+                aktuellesZiel={typ:"eliminieren",name:"Säubert das feindliche Depot und sichert die Vorräte"};
+            } else if(spieler.mission===14) {
+                aktuellesZiel={typ:"erreichen",name:"Erreiche die Versorgungsroute und schneide den Feind ab"};
+            } else if(spieler.mission===15) {
+                aktuellesZiel={typ:"ueberleben",name:"Halte die Stellung – der große Gegenangriff beginnt"};
+            } else if(spieler.mission===16) {
+                aktuellesZiel={typ:"panzer",name:"Sichere den feindlichen Panzer für den letzten Vorstoß"};
+            } else if(spieler.mission===17) {
+                aktuellesZiel={typ:"flugzeug",name:"Erreiche den letzten Flugplatz und sichere den Zugang zur Festung"};
+            } else if(spieler.mission===18) {
+                aktuellesZiel={typ:"eliminieren",name:"Finde den Big Boss und töte ihn!"};
             } else {
                 aktuellesZiel=missionsziele[(spieler.mission-1)%missionsziele.length];
             }
@@ -3946,7 +4020,7 @@ if(missionsNummer===8){
                 }
             } else {
                 setTimeout(() => {
-                    alert("Glückwunsch! Alle 12 Missionen geschafft! +200$. Die Kampagne beginnt erneut.");
+                    alert("Glückwunsch! Alle 18 Missionen geschafft! Der Big Boss ist besiegt. +200$. Die Kampagne beginnt erneut.");
                     spieler.mission = 1;
                     starteMission();
                 }, 50);
@@ -4097,6 +4171,11 @@ if(missionsNummer===8){
                 rotationY=Math.PI;
                 rotationX=0;
             }
+            if(spieler.mission===18){
+                camera.position.set(35,2,-118);
+                rotationY=0;
+                rotationX=0;
+            }
             if(spieler.mission===5 && flugzeugObjekt){
                 spielerImFlugzeug=true;
                 flugzeugHp=100;
@@ -4115,7 +4194,7 @@ if(missionsNummer===8){
                 scene.remove(zielZone);
                 zielZone = null;
             }
-            const gegnerAnzahl=(spieler.mission===4 || spieler.mission===5 || spieler.mission===10 || spieler.mission===11 || spieler.mission===2 || spieler.mission===3) ? 0 : Math.min(18,3+spieler.mission+Math.floor(spieler.mission/3));
+            const gegnerAnzahl=(spieler.mission===4 || spieler.mission===5 || spieler.mission===10 || spieler.mission===11 || spieler.mission===18 || spieler.mission===2 || spieler.mission===3) ? 0 : Math.min(18,3+spieler.mission+Math.floor(spieler.mission/3));
             erstelleGegner(gegnerAnzahl);
 
             if(spieler.mission===5){
