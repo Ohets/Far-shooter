@@ -1989,12 +1989,13 @@
                 flugzeugZielPosition
             );
 
-            if(
-                d<9 &&
-                flugzeugObjekt.position.y<7 &&
-                speed<18 &&
-                Math.abs(flugzeugVertikalGeschwindigkeit)<4
-            ){
+            // Mission 4 ist abgeschlossen, sobald das Flugzeug die grüne
+            // Zielmarkierung erreicht. Eine Landung ist dafür nicht nötig.
+            const zielDX=flugzeugObjekt.position.x-flugzeugZielPosition.x;
+            const zielDZ=flugzeugObjekt.position.z-flugzeugZielPosition.z;
+            const zielDistanz2D=Math.hypot(zielDX,zielDZ);
+
+            if(zielDistanz2D<10 && flugzeugObjekt.position.y<25){
                 planeThrottleInput=0;
                 flugzeugGeschwindigkeit=0;
                 flugzeugVertikalGeschwindigkeit=0;
