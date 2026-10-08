@@ -39,7 +39,11 @@
         @keyframes alarmPulse { from { transform:translate(-50%,-50%) scale(1); } to { transform:translate(-50%,-50%) scale(1.05); } }
         #level-menu { display:none; position:absolute; top:5%; left:5%; width:90%; height:90%; background:rgba(8,12,14,0.96); border:2px solid #4aa3df; color:white; pointer-events:auto; padding:16px; box-sizing:border-box; overflow-y:auto; z-index:20; }
         #level-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
-        .level-card { background:linear-gradient(145deg,#263238,#111); border:1px solid #566; border-radius:8px; padding:12px; min-height:78px; }
+        .level-card { background:linear-gradient(145deg,#263238,#111); border:1px solid #566; border-radius:8px; padding:12px; min-height:105px; box-sizing:border-box; }
+        .level-card.active-mission { border:2px solid #4aa3df; box-shadow:0 0 12px rgba(74,163,223,0.35); }
+        .level-card-head { font-size:11px; color:#7fc8ff; margin-bottom:6px; font-weight:bold; }
+        .level-status { letter-spacing:.5px; }
+        .level-title { display:block; min-height:34px; font-size:15px; }
         .level-card button { margin-top:8px; width:100%; padding:9px; border:0; border-radius:5px; background:#2e8b57; color:white; font-weight:bold; }
         .level-card small { color:#bfc8cc; }
 
@@ -65,7 +69,7 @@
     </div>
     
     <div id="mission-info" class="ui-element">
-        Mission <span id="mission-num">1</span>/12<br>
+        Mission <span id="mission-num">1</span>/18<br>
         Ziel: <span id="objective-text">Eliminiere alle Gegner</span>
     </div>
     <div id="alarm-banner">🚨 ALARM! 🚨<br><small>Alle Wachen greifen an!</small></div>
@@ -89,7 +93,7 @@
     <div id="level-menu">
         <button class="close-btn" onclick="toggleLevelMenu()">X Schließen</button>
         <h2>🎯 Level auswählen</h2>
-        <p>Wähle direkt eine der 12 Einsatzmissionen.</p>
+        <p>Wähle eine der 18 Einsatzmissionen aus. Du kannst jede Mission direkt starten.</p>
         <div id="level-grid"></div>
     </div>
 
@@ -4468,13 +4472,30 @@ if(missionsNummer===8){
         function renderLevelMenu() {
             const grid=document.getElementById('level-grid');
             grid.innerHTML="";
+            
             missionsSzenerien.forEach((m,i)=>{
+                const missionNum=i+1;
                 const card=document.createElement('div');
-                card.className='level-card';
-                card.innerHTML='<b>Level '+(i+1)+': '+m.name+'</b><br><small>Einsatzgebiet: '+m.name+'</small>';
+                card.className='level-card' + (spieler.mission===missionNum ? ' active-mission' : '');
+                
+                const status = spieler.mission===missionNum
+                    ? '<span class="level-status">AKTUELLE MISSION</span>'
+                    : '<span class="level-status">MISSION '+missionNum+'</span>';
+                
+                card.innerHTML=
+                    '<div class="level-card-head">'+status+'</div>' +
+                    '<b class="level-title">'+m.name+'</b><br>' +
+                    '<small>Einsatzgebiet: '+m.name+'</small>';
+                
                 const btn=document.createElement('button');
-                btn.textContent='LEVEL '+(i+1)+' STARTEN';
-                btn.onclick=function(){ spieler.mission=i+1; spieler.hp=100; starteMission(); toggleLevelMenu(); };
+                btn.textContent=spieler.mission===missionNum ? 'MISSION NEU STARTEN' : 'MISSION '+missionNum+' STARTEN';
+                btn.onclick=function(){
+                    spieler.mission=missionNum;
+                    spieler.hp=100;
+                    starteMission();
+                    toggleLevelMenu();
+                };
+                
                 card.appendChild(btn);
                 grid.appendChild(card);
             });
