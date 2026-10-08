@@ -3449,7 +3449,7 @@
                         } else if(spieler.mission===6) {
                 aktuellesZiel={typ:"atombombe",name:"Finde die Atombombe"};
             } else if(spieler.mission===7) {
-                aktuellesZiel={typ:"atombombe_transport",name:"Bringe die Atombombe sicher nach draußen"};
+                aktuellesZiel={typ:"atombombe_transport",name:"Steige in den Lastwagen ein und hole die Atombombe"};
             } else if(spieler.mission===11) {
                 aktuellesZiel={typ:"geisel",name:"Rette die Geisel – kein Alarm!"};
             } else if(spieler.mission===12) {
@@ -3545,7 +3545,7 @@
                 const d=camera.position.distanceTo(atombombeObjekt.position);
                 if(d<8) missionErfolgreich();
             }
-            if(aktuellesZiel.typ === "atombombe_transport" && lastwagenObjekt && atombombeObjekt && !atombombeAufgeladen){
+            if(aktuellesZiel.typ === "atombombe_transport" && lastwagenObjekt && atombombeObjekt && !atombombeAufgeladen && spielerImLastwagen){
                 const d=lastwagenObjekt.position.distanceTo(atombombeObjekt.position);
                 if(d<8){
                     atombombeAufgeladen=true;
@@ -3553,6 +3553,7 @@
                     atombombeObjekt.position.set(0,4.0,-0.2);
                     lastwagenObjekt.add(atombombeObjekt);
                     atombombeObjekt.visible=true;
+                    aktuellesZiel.name="Bringe die Atombombe sicher zum Ausgang";
                     ausgebenUI();
                 }
             }
@@ -3677,6 +3678,13 @@
                 erstelleGegner(10);
                 for(const g of gegnerArray){
                     g.schutzpunkt=new THREE.Vector3(0,0,-82);
+                }
+            }
+            if(spieler.mission===7){
+                gegnerArray.length=0;
+                erstelleGegner(12);
+                for(const g of gegnerArray){
+                    g.schutzpunkt=new THREE.Vector3(-72,0,-68);
                 }
             }
             if(spieler.mission===11){
