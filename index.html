@@ -1819,21 +1819,35 @@
             szenerieGruppe.add(ring);
 
             const beacon=new THREE.Mesh(
-                new THREE.CylinderGeometry(0.18,0.18,7,8),
-                new THREE.MeshBasicMaterial({color:0xff7b00})
+                new THREE.CylinderGeometry(0.28,0.28,18,10),
+                new THREE.MeshBasicMaterial({color:0xff2200,transparent:true,opacity:0.78})
             );
-            beacon.position.set(cx,3.5,cz);
+            beacon.position.set(cx,9,cz);
             szenerieGruppe.add(beacon);
+
+            // Sehr gut sichtbare Zielmarkierung aus der Luft.
+            const zielKegel=new THREE.Mesh(
+                new THREE.ConeGeometry(5.5,14,32,1,true),
+                new THREE.MeshBasicMaterial({
+                    color:0xff3300,
+                    transparent:true,
+                    opacity:0.20,
+                    side:THREE.DoubleSide,
+                    depthWrite:false
+                })
+            );
+            zielKegel.position.set(cx,7,cz);
+            szenerieGruppe.add(zielKegel);
 
             const canvas=document.createElement('canvas');
             canvas.width=512; canvas.height=96;
             const ctx=canvas.getContext('2d');
             ctx.fillStyle='rgba(0,0,0,0.86)';
             ctx.fillRect(0,0,512,96);
-            ctx.fillStyle='#ffb000';
+            ctx.fillStyle='#ff2b1a';
             ctx.font='bold 34px sans-serif';
             ctx.textAlign='center';
-            ctx.fillText('MUNITIONSLAGER',256,58);
+            ctx.fillText('💣 MUNITIONSLAGER 💣',256,58);
             const label=new THREE.Sprite(new THREE.SpriteMaterial({
                 map:new THREE.CanvasTexture(canvas),
                 transparent:true,
@@ -1843,7 +1857,7 @@
             label.position.set(cx,8.8,cz);
             szenerieGruppe.add(label);
 
-            munitionslagerObjekt={gruppe:lager, ring, beacon, label, x:cx, z:cz};
+            munitionslagerObjekt={gruppe:lager, ring, beacon, zielKegel, label, x:cx, z:cz};
             munitionslagerHp=3;
             munitionslagerZerstoert=false;
         }
@@ -1887,6 +1901,7 @@
                         munitionslagerZerstoert=true;
                         if(munitionslagerObjekt.ring) munitionslagerObjekt.ring.visible=false;
                         if(munitionslagerObjekt.beacon) munitionslagerObjekt.beacon.visible=false;
+                        if(munitionslagerObjekt.zielKegel) munitionslagerObjekt.zielKegel.visible=false;
                         if(munitionslagerObjekt.label) munitionslagerObjekt.label.visible=false;
                         missionErfolgreich();
                     }
