@@ -1923,7 +1923,7 @@
         function mission4AbschlussBereitFuer5(){
             if(mission4UebergangAktiv) return;
             mission4UebergangAktiv=true;
-            missionAbgeschlossen=true;
+            missionAbgeschlossen=false;
             spieler.credits+=200;
             spieler.mission=5;
             aktuellesZiel={
@@ -4059,11 +4059,23 @@
                                 if(flugzeugHp<=0){
                                     flugzeugHp=100;
                                     spieler.hp=100;
-                                    spielerImFlugzeug=false;
-                                    planeThrottleInput=0;
-                                    flugzeugGeschwindigkeit=0;
-                                    alert("Das Flugzeug wurde abgeschossen! Mission 5 startet neu.");
-                                    starteMission();
+                                    spielerImFlugzeug=true;
+                                    planeThrottleInput=0.35;
+                                    flugzeugGeschwindigkeit=20;
+                                    flugzeugVertikalGeschwindigkeit=0;
+                                    flugzeugPitch=0;
+                                    flugzeugObjekt.position.set(0,24,25);
+                                    flugzeugObjekt.rotation.set(0,Math.PI/2,0);
+                                    rotationX=0;
+                                    rotationY=Math.PI/2;
+                                    gegnerArray.forEach(g=>{
+                                        if(g && g.mesh){
+                                            g.mesh.position.x += 0;
+                                            g.entdeckt=false;
+                                            g.shotCooldown=1.5+Math.random();
+                                        }
+                                    });
+                                    alert("Das Flugzeug wurde abgeschossen! Der Einsatz beginnt erneut.");
                                     ausgebenUI();
                                 }
                             } else {
