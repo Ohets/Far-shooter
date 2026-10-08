@@ -2446,7 +2446,7 @@
                 rotationX=Math.max(-0.65,Math.min(0.5,rotationX));
 
                 // Kamera bleibt hinter der Fahrzeugfront (lokale -X-Seite).
-                const sitzOffset=new THREE.Vector3(-15.0,5.2,0);
+                const sitzOffset=new THREE.Vector3(-17.0,7.0,0);
                 sitzOffset.applyAxisAngle(new THREE.Vector3(0,1,0),lastwagenObjekt.rotation.y);
                 camera.position.copy(lastwagenObjekt.position).add(sitzOffset);
                 camera.position.y=4.2;
