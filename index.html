@@ -2438,11 +2438,24 @@
                     lastwagenObjekt.position.x=Math.max(-245,Math.min(245,lastwagenObjekt.position.x));
                     lastwagenObjekt.position.z=Math.max(-245,Math.min(245,lastwagenObjekt.position.z));
                 }
+                // Sicht im Lastwagen: rechter Joystick und Wischen verändern die Kamera.
+                rotationY -= lookInput.x * delta * 1.8;
+                rotationX += lookInput.y * delta * 1.25;
+                rotationX=Math.max(-0.65,Math.min(0.5,rotationX));
+
                 const sitzOffset=new THREE.Vector3(0,3.8,7.0);
                 sitzOffset.applyAxisAngle(new THREE.Vector3(0,1,0),lastwagenObjekt.rotation.y);
                 camera.position.copy(lastwagenObjekt.position).add(sitzOffset);
                 camera.position.y=3.8;
-                rotationY=lastwagenObjekt.rotation.y;
+
+                const sichtRichtung=new THREE.Vector3(
+                    Math.sin(rotationY)*Math.cos(rotationX),
+                    Math.sin(rotationX),
+                    Math.cos(rotationY)*Math.cos(rotationX)
+                );
+                const sichtZiel=lastwagenObjekt.position.clone().addScaledVector(sichtRichtung,30);
+                sichtZiel.y+=2.0;
+                camera.lookAt(sichtZiel);
                 return;
             }
             if(!panzerObjekt || (spieler.mission!==2 && spieler.mission!==3)) return;
@@ -3108,7 +3121,7 @@
         // Im Panzer kann die Sicht direkt durch Wischen über den Bildschirm
         // verändert werden. Der Wisch-Finger wird getrennt von den Joysticks behandelt.
         canvasContainer.addEventListener('touchstart', (e) => {
-            if(!spielerImPanzer || panzerSwipeId !== null) return;
+            if(!(spielerImPanzer || spielerImLastwagen) || panzerSwipeId !== null) return;
             if(e.target.closest && e.target.closest('#move-stick, #look-stick, #fire-btn, #aim-btn, #tank-btn, #jump-btn, #shop-btn, #level-btn')) return;
             if(e.changedTouches.length){
                 const t=e.changedTouches[0];
@@ -3119,7 +3132,7 @@
         }, {passive:true});
 
         canvasContainer.addEventListener('touchmove', (e) => {
-            if(!spielerImPanzer || panzerSwipeId === null) return;
+            if(!(spielerImPanzer || spielerImLastwagen) || panzerSwipeId === null) return;
             const t=Array.from(e.touches).find(x=>x.identifier===panzerSwipeId);
             if(!t) return;
             const dx=t.clientX-panzerSwipeX;
@@ -3128,7 +3141,7 @@
             panzerSwipeY=t.clientY;
             rotationY -= dx * 0.008;
             rotationX += dy * 0.006;
-            rotationX=Math.max(-0.55,Math.min(0.35,rotationX));
+            rotationX=Math.max(-0.65,Math.min(0.5,rotationX));
             e.preventDefault();
         }, {passive:false});
 
