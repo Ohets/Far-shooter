@@ -1844,9 +1844,9 @@
             // --- FLUGLAGE ---
             const q=new THREE.Quaternion().setFromEuler(
                 new THREE.Euler(
-                    flugzeugPitch,
-                    flugzeugObjekt.rotation.y,
                     flugzeugObjekt.rotation.x,
+                    flugzeugObjekt.rotation.y,
+                    flugzeugPitch,
                     'YXZ'
                 )
             );
@@ -1865,7 +1865,7 @@
             // Bank reduziert den vertikalen Auftrieb.
             const bankFactor=Math.max(
                 0.35,
-                Math.cos(flugzeugObjekt.rotation.z)
+                Math.cos(flugzeugObjekt.rotation.x)
             );
 
             const lift=9.81*liftFactor*0.62*bankFactor;
