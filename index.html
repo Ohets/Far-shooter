@@ -1662,18 +1662,18 @@
         function baueMission4Flugzeug(){
             baueMission3PanzerGebiet();
             const objekte=[...panzerZerstoerbareObjekte];
-            const hangar=objekte.find(o=>o && o.userData.zielTyp==='flugzeugPanzerplatte')?.parent;
+            const alterHangar=objekte.find(o=>o && o.userData.zielTyp==='flugzeugPanzerplatte')?.parent;
             objekte.forEach(o=>{
                 if(o && o.parent) o.parent.remove(o);
                 const k=weltKollisionsobjekte.indexOf(o);
                 if(k>=0) weltKollisionsobjekte.splice(k,1);
             });
-            if(hangar){
-                hangar.traverse(o=>{
+            if(alterHangar){
+                alterHangar.traverse(o=>{
                     const k=weltKollisionsobjekte.indexOf(o);
                     if(k>=0) weltKollisionsobjekte.splice(k,1);
                 });
-                if(hangar.parent) hangar.parent.remove(hangar);
+                if(alterHangar.parent) alterHangar.parent.remove(alterHangar);
             }
             panzerZerstoerbareObjekte=[];
             if(geheimesFlugzeug){
