@@ -1706,26 +1706,120 @@
                 if(o.isSprite && Math.abs(o.position.x-85)<1 && Math.abs(o.position.z+85)<1) o.visible=false;
             });
 
-            const runway=new THREE.Mesh(new THREE.PlaneGeometry(18,420),new THREE.MeshLambertMaterial({color:0x25282a}));
-            runway.rotation.x=-Math.PI/2; runway.position.set(85,0.03,-5); runway.receiveShadow=true; szenerieGruppe.add(runway);
+            // Mission-4-Flugplatz direkt an der grünen Zielmarkierung.
+            // Die alte gelbe Hangar-/Zielmarkierung wird nicht mehr angezeigt.
+            const zielX=flugzeugZielPosition.x;
+            const zielZ=flugzeugZielPosition.z;
+
+            const runway=new THREE.Mesh(
+                new THREE.PlaneGeometry(24,300),
+                new THREE.MeshLambertMaterial({color:0x25282a})
+            );
+            runway.rotation.x=-Math.PI/2;
+            runway.position.set(zielX,0.03,zielZ);
+            runway.receiveShadow=true;
+            szenerieGruppe.add(runway);
+
             const lineMat=new THREE.MeshBasicMaterial({color:0xffffff});
-            for(let z=-210;z<=200;z+=12){
-                const line=new THREE.Mesh(new THREE.PlaneGeometry(0.45,6),lineMat);
-                line.rotation.x=-Math.PI/2; line.position.set(85,0.06,z); szenerieGruppe.add(line);
+            for(let z=zielZ-145;z<=zielZ+145;z+=14){
+                const line=new THREE.Mesh(new THREE.PlaneGeometry(0.55,7),lineMat);
+                line.rotation.x=-Math.PI/2;
+                line.position.set(zielX,0.06,z);
+                szenerieGruppe.add(line);
             }
-            for(const x of [76.2,93.8]){
-                const edge=new THREE.Mesh(new THREE.PlaneGeometry(0.18,420),lineMat);
-                edge.rotation.x=-Math.PI/2; edge.position.set(x,0.055,-5); szenerieGruppe.add(edge);
+            for(const x of [zielX-11.2,zielX+11.2]){
+                const edge=new THREE.Mesh(new THREE.PlaneGeometry(0.22,300),lineMat);
+                edge.rotation.x=-Math.PI/2;
+                edge.position.set(x,0.055,zielZ);
+                szenerieGruppe.add(edge);
             }
-            for(let z=-210;z<=200;z+=15) for(const x of [75.2,94.8]){
-                const light=new THREE.Mesh(new THREE.SphereGeometry(0.16,8,6),new THREE.MeshBasicMaterial({color:0xffd34d}));
-                light.position.set(x,0.18,z); szenerieGruppe.add(light);
+
+            // Blaue Randlichter der geheimen Landebahn.
+            for(let z=zielZ-145;z<=zielZ+145;z+=15) for(const x of [zielX-12.2,zielX+12.2]){
+                const light=new THREE.Mesh(
+                    new THREE.SphereGeometry(0.18,8,6),
+                    new THREE.MeshBasicMaterial({color:0x4fc3ff})
+                );
+                light.position.set(x,0.2,z);
+                szenerieGruppe.add(light);
             }
+
+            // Geschlossener Hangar direkt neben der grünen Markierung.
+            // Das Gebäude hat eine große dunkle Öffnung, damit das Flugzeug
+            // optisch darin versteckt werden kann.
+            const hangarMission4=new THREE.Group();
+            const hangarMat=new THREE.MeshLambertMaterial({color:0x3a4248});
+            const roofMat=new THREE.MeshLambertMaterial({color:0x20262b});
+            const hangarX=zielX+20;
+            const hangarZ=zielZ;
+
+            const hangarBody=new THREE.Mesh(
+                new THREE.BoxGeometry(34,12,30),
+                hangarMat
+            );
+            hangarBody.position.set(hangarX,6,hangarZ);
+            hangarMission4.add(hangarBody);
+
+            const roof=new THREE.Mesh(
+                new THREE.BoxGeometry(36,1.2,32),
+                roofMat
+            );
+            roof.position.set(hangarX,12.6,hangarZ);
+            hangarMission4.add(roof);
+
+            const door=new THREE.Mesh(
+                new THREE.BoxGeometry(0.35,9.5,20),
+                new THREE.MeshBasicMaterial({color:0x080b0d})
+            );
+            door.position.set(hangarX-17.2,4.9,hangarZ);
+            hangarMission4.add(door);
+
+            // Hangartor-Rahmen.
+            const frameMat=new THREE.MeshLambertMaterial({color:0x59636a});
+            for(const z of [hangarZ-11,hangarZ+11]){
+                const post=new THREE.Mesh(new THREE.BoxGeometry(0.8,10.5,0.8),frameMat);
+                post.position.set(hangarX-17.5,5.2,z);
+                hangarMission4.add(post);
+            }
+            const topFrame=new THREE.Mesh(new THREE.BoxGeometry(0.8,0.8,22.8),frameMat);
+            topFrame.position.set(hangarX-17.5,10.2,hangarZ);
+            hangarMission4.add(topFrame);
+
+            // Innenboden und schwaches Licht.
+            const floor=new THREE.Mesh(
+                new THREE.BoxGeometry(32,0.3,28),
+                new THREE.MeshLambertMaterial({color:0x15191c})
+            );
+            floor.position.set(hangarX,0.18,hangarZ);
+            hangarMission4.add(floor);
+
+            const hangarLight=new THREE.PointLight(0x88bbff,1.6,45);
+            hangarLight.position.set(hangarX-5,9,hangarZ);
+            hangarMission4.add(hangarLight);
+
+            hangarMission4.traverse(o=>{
+                if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}
+            });
+            szenerieGruppe.add(hangarMission4);
+
+            // Grüne Zielmarkierung bleibt vor dem Versteck sichtbar.
             const safe=new THREE.Group();
-            const ring=new THREE.Mesh(new THREE.RingGeometry(5.5,6.5,36),new THREE.MeshBasicMaterial({color:0x00ff66,side:THREE.DoubleSide,transparent:true,opacity:0.72}));
+            const ring=new THREE.Mesh(
+                new THREE.RingGeometry(5.5,6.5,36),
+                new THREE.MeshBasicMaterial({
+                    color:0x00ff66,side:THREE.DoubleSide,
+                    transparent:true,opacity:0.72
+                })
+            );
             ring.rotation.x=-Math.PI/2;
-            const beacon=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.18,6,8),new THREE.MeshBasicMaterial({color:0x00ff66}));
-            beacon.position.y=3; safe.add(ring,beacon); safe.position.copy(flugzeugZielPosition); szenerieGruppe.add(safe);
+            const beacon=new THREE.Mesh(
+                new THREE.CylinderGeometry(0.18,0.18,6,8),
+                new THREE.MeshBasicMaterial({color:0x00ff66})
+            );
+            beacon.position.y=3;
+            safe.add(ring,beacon);
+            safe.position.set(zielX,0,zielZ);
+            szenerieGruppe.add(safe);
         }
 
         function aktualisiereFlugzeugButton(){
@@ -2997,889 +3091,3 @@
                 scene.remove(zielZone);
                 zielZone = null;
             }
-
-            if(spieler.mission===1) {
-                aktuellesZiel={typ:"panzer",name:"Suche den Panzer – stark bewacht!"};
-            } else if(spieler.mission===2) {
-                aktuellesZiel={typ:"panzer_fahrt",name:"Bringe den Panzer sicher nach draußen in unser Versteck"};
-            } else if(spieler.mission===3) {
-                aktuellesZiel={typ:"flugzeug",name:"Dringe in das Gebiet ein und zerstöre den Hangar"};
-            } else if(spieler.mission===4) {
-                aktuellesZiel={typ:"flugzeug_fahrt",name:"Bringe das Flugzeug in das sichere Versteck"};
-            } else if(spieler.mission===11) {
-                aktuellesZiel={typ:"geisel",name:"Rette die Geisel – kein Alarm!"};
-            } else if(spieler.mission===12) {
-                aktuellesZiel={typ:"verbuendete",name:"Gemeinsam vorrücken – eliminiert alle Gegner"};
-            } else {
-                aktuellesZiel=missionsziele[(spieler.mission-1)%missionsziele.length];
-            }
-
-            if(aktuellesZiel.typ === "ueberleben") {
-                zielZeit = 22 + spieler.mission * 4;
-            }
-
-            if(aktuellesZiel.typ === "erreichen") {
-                const zone = new THREE.Group();
-                const ring = new THREE.Mesh(
-                    new THREE.RingGeometry(4, 5, 32),
-                    new THREE.MeshBasicMaterial({color:0x00ff66, side:THREE.DoubleSide, transparent:true, opacity:0.75})
-                );
-                ring.rotation.x = -Math.PI / 2;
-                const beacon = new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.18, 0.18, 6, 8),
-                    new THREE.MeshBasicMaterial({color:0x00ff66})
-                );
-                beacon.position.y = 3;
-                zone.add(ring, beacon);
-                zone.position.set(Math.random()*170-85, 0.04, Math.random()*170-85);
-                zielZone = zone;
-                scene.add(zone);
-
-            gegnerArray.forEach(g => {
-                    g.schutzpunkt = zone.position.clone();
-                });
-            }
-            ausgebenUI();
-        }
-
-        function missionErfolgreich() {
-            if(missionAbgeschlossen) return;
-            missionAbgeschlossen = true;
-            playWinSound();
-            spieler.credits += 200;
-            const alteMission = spieler.mission;
-
-            if(spieler.mission < missionsSzenerien.length) {
-                spieler.mission++;
-                setTimeout(() => {
-                    alert("Mission " + alteMission + " abgeschlossen! +200$. Neues Missionsziel: " + (spieler.mission===11 ? "Geiselrettung" : spieler.mission===12 ? "Verbündetenoffensive" : missionsziele[(spieler.mission-1)%missionsziele.length].name) + ".");
-                    starteMission();
-                }, 50);
-            } else {
-                setTimeout(() => {
-                    alert("Glückwunsch! Alle 12 Missionen geschafft! +200$. Die Kampagne beginnt erneut.");
-                    spieler.mission = 1;
-                    starteMission();
-                }, 50);
-            }
-        }
-
-        function ueberpruefeMission() {
-            if(!aktuellesZiel || missionAbgeschlossen) return;
-
-            if(aktuellesZiel.typ === "eliminieren" && gegnerArray.length === 0) {
-                missionErfolgreich();
-            }
-
-            if(aktuellesZiel.typ === "ueberleben" && zielZeit <= 0) {
-                missionErfolgreich();
-            }
-
-            if(aktuellesZiel.typ === "verbuendete" && gegnerArray.length===0) missionErfolgreich();
-
-            if(aktuellesZiel.typ === "erreichen" && zielZone) {
-                const d=camera.position.distanceTo(zielZone.position);
-                if(d<5.5) missionErfolgreich();
-            }
-            if(aktuellesZiel.typ === "geisel" && geiselZone && !geiselAlarm) {
-                const d=camera.position.distanceTo(geiselZone.position);
-                if(d<4.0) missionErfolgreich();
-            }
-            if(aktuellesZiel.typ === "panzer" && panzerObjekt) {
-                const d=camera.position.distanceTo(panzerPosition);
-                if(d<7.5) missionErfolgreich();
-            }
-            if(aktuellesZiel.typ === "flugzeug" && geheimesFlugzeug && geheimesFlugzeug.visible) {
-                if(camera.position.distanceTo(geheimesFlugzeug.position)<8 && !missionAbgeschlossen) missionErfolgreich();
-            }
-
-            if(aktuellesZiel.typ === "flugzeug_fahrt" && flugzeugObjekt && !missionAbgeschlossen) {
-                const d=flugzeugObjekt.position.distanceTo(flugzeugZielPosition);
-                if(d<9 && flugzeugObjekt.position.y<7 && flugzeugGeschwindigkeit<12) missionErfolgreich();
-            }
-
-            if(aktuellesZiel.typ === "panzer_fahrt" && panzerObjekt) {
-                const d=panzerObjekt.position.distanceTo(panzerZielPosition);
-                if(d<7.5 && !missionAbgeschlossen) {
-                    spielerImPanzer=false;
-                    missionErfolgreich();
-                }
-            }
-        }
-
-        function starteMission() {
-            if(geiselObjekt){scene.remove(geiselObjekt);geiselObjekt=null;}
-            if(panzerObjekt){scene.remove(panzerObjekt);panzerObjekt=null;}
-            flugzeugObjekt=null; spielerImFlugzeug=false; flugzeugGeschwindigkeit=0; flugzeugPitch=0;
-            spielerImPanzer=false;
-            panzerFahrbar=false;
-            panzerTurm=null;
-            panzerLauf=null;
-            if(geiselZone){scene.remove(geiselZone);geiselZone=null;}
-            verbuendeteArray.forEach(a=>scene.remove(a.mesh));
-            verbuendeteArray=[];
-            baueSzenerie(spieler.mission);
-            geiselAlarm=false;
-            const alarmBanner=document.getElementById('alarm-banner');
-            if(alarmBanner) alarmBanner.style.display='none';
-            if(geiselZone){scene.remove(geiselZone);geiselZone=null;}
-            camera.position.set(0, 2, 0);
-            rotationX = 0;
-            rotationY = 0;
-            if(spieler.mission===2 || spieler.mission===3){
-                camera.position.set(panzerPosition.x-6,2,panzerPosition.z+3);
-                rotationY=Math.atan2(panzerPosition.x-camera.position.x,panzerPosition.z-camera.position.z);
-            }
-            if(spieler.mission===4 && flugzeugObjekt){ camera.position.set(flugzeugObjekt.position.x-7,2.5,flugzeugObjekt.position.z); rotationY=flugzeugObjekt.rotation.y; }
-            if(zielZone) {
-                scene.remove(zielZone);
-                zielZone = null;
-            }
-            const gegnerAnzahl=(spieler.mission===4 || spieler.mission===11 || spieler.mission===2 || spieler.mission===3) ? 0 : Math.min(18,3+spieler.mission+Math.floor(spieler.mission/3));
-            erstelleGegner(gegnerAnzahl);
-            if(spieler.mission===11){
-                [[24,-40],[32,-40],[40,-40],[21,-30],[43,-30],[24,-20],[32,-20],[40,-20],[27,-25],[37,-25]]
-                .forEach((p,i)=>fuegeGeiselWacheHinzu(p[0],p[1],i));
-            }
-            if(spieler.mission===1){
-                // Level 1: großer Sicherungsring direkt um den Panzer.
-                const aktiveWachen=[
-                    [-10,-4],[-7,-8],[0,-10],[7,-8],[10,-4],
-                    [-11,4],[-7,9],[0,11],[7,9],[11,4],
-                    [-4,-13],[4,-13]
-                ];
-                aktiveWachen.forEach((p,i)=>{
-                    const mesh=erstelleSoldat();
-                    mesh.position.set(panzerPosition.x+p[0],0,panzerPosition.z+p[1]);
-                    scene.add(mesh);
-                    const verhalten=(i%4===0) ? "scharfschuetze" : "verteidiger";
-                    const hp=135+spieler.mission*32;
-                    gegnerArray.push({
-                        mesh,
-                        material:mesh.userData.parts.uniformMat,
-                        hp,maxHp:hp,
-                        flashTimer:0,
-                        attackCooldown:0.5+Math.random(),
-                        animTime:Math.random()*10,
-                        walkPhase:Math.random()*Math.PI*2,
-                        dying:false,
-                        deathTime:0,
-                        muzzleTime:0,
-                        shotCooldown:0.8+Math.random()*1.4,
-                        verhalten,
-                        spawnPosition:mesh.position.clone(),
-                        strafeDir:i%2?1:-1,
-                        strafeTimer:1+Math.random()*2,
-                        lastPlayerShot:0,
-                        shootAnimTime:0,
-                        shootRecoil:0,
-                        entdeckt:false,
-                        entdeckungsZeit:0,
-                        schutzpunkt:panzerPosition.clone(),
-                        festerPosten:false
-                    });
-                });
-            }
-
-            if(spieler.mission===2){
-                // Level 2: Die Soldaten versperren den Ausgang und bewachen das Zielgebiet,
-                // statt direkt am Panzer zu stehen.
-                const wachen2=[
-                    [-9,-1],[-7,3],[-4,-1],[-1,3],[2,-1],[5,3],[8,-1],
-                    [-3,-6],[3,-6]
-                ];
-                wachen2.forEach((p,i)=>{
-                    const mesh=erstelleSoldat();
-                    mesh.position.set(panzerZielPosition.x+p[0],0,panzerZielPosition.z+p[1]);
-                    mesh.rotation.y=Math.atan2(panzerPosition.x-mesh.position.x,panzerPosition.z-mesh.position.z);
-                    scene.add(mesh);
-                    const verhalten=(i%4===0) ? "scharfschuetze" : "verteidiger";
-                    const hp=135+spieler.mission*32;
-                    gegnerArray.push({
-                        mesh,
-                        material:mesh.userData.parts.uniformMat,
-                        hp,maxHp:hp,
-                        flashTimer:0,
-                        attackCooldown:0.5+Math.random(),
-                        animTime:Math.random()*10,
-                        walkPhase:Math.random()*Math.PI*2,
-                        dying:false, deathTime:0, muzzleTime:0,
-                        shotCooldown:0.8+Math.random()*1.4,
-                        verhalten,
-                        spawnPosition:mesh.position.clone(),
-                        strafeDir:i%2?1:-1,
-                        strafeTimer:1+Math.random()*2,
-                        lastPlayerShot:0, shootAnimTime:0, shootRecoil:0,
-                        entdeckt:false, entdeckungsZeit:0,
-                        schutzpunkt:panzerZielPosition.clone(),
-                        festerPosten:false
-                    });
-                });
-            }
-
-            if(spieler.mission===12) starteVerbuendete();
-
-            // Stationäre Scharfschützen auf den Wachtürmen.
-            if(spieler.mission!==4){
-            const turmPositionen = spieler.mission <= 5
-                ? [[-48,-42],[48,42]]
-                : spieler.mission <= 8
-                    ? [[-48,-42],[48,42],[48,-42]]
-                    : [[-48,-42],[48,42],[48,-42],[-48,42]];
-
-            turmPositionen.forEach((pos, index) => {
-                const mesh = erstelleSoldat();
-                mesh.position.set(pos[0], 7.5, pos[1]);
-                scene.add(mesh);
-
-                gegnerArray.push({
-                    mesh,
-                    material: mesh.userData.parts.uniformMat,
-                    hp: 145 + (spieler.mission * 32),
-                    maxHp: 145 + (spieler.mission * 32),
-                    flashTimer: 0,
-                    attackCooldown: 1,
-                    animTime: Math.random()*10,
-                    walkPhase: Math.random()*10,
-                    dying: false,
-                    deathTime: 0,
-                    muzzleTime: 0,
-                    shotCooldown: 1.2 + Math.random()*1.5,
-                    verhalten: "scharfschuetze",
-                    spawnPosition: mesh.position.clone(),
-                    strafeDir: 1,
-                    strafeTimer: 2,
-                    lastPlayerShot: 0,
-                    shootAnimTime: 0,
-                    shootRecoil: 0,
-                    entdeckt: false,
-                    entdeckungsZeit: 0,
-                    schutzpunkt: null,
-                    festerPosten: true,
-                    turmIndex: index,
-                    sniperIdlePhase: Math.random()*Math.PI*2,
-                    geiselWache:spieler.mission===11,
-                    geiselSichtReichweite:42,
-                    geiselSichtSchwelle:0.40
-                });
-            });
-            }
-
-            neuesMissionsziel();
-        }
-
-        function ausgebenUI() {
-            document.getElementById('hp-val').innerText = spieler.hp;
-            document.getElementById('credits-val').innerText = spieler.credits;
-            document.getElementById('weapon-val').innerText = aktuelleWaffe.name;
-            document.getElementById('cover-status').innerText = spielerIstInGebaeude() ? '🛡️ IN DECKUNG' : '';
-            document.getElementById('mission-num').innerText = spieler.mission;
-            aktualisierePanzerButton();
-            if(aktuellesZiel) {
-                if(aktuellesZiel.typ === "ueberleben") {
-                    const rest = Math.max(0, Math.ceil(zielZeit));
-                    document.getElementById('objective-text').innerText = aktuellesZiel.name + " " + rest + "s";
-                } else if(aktuellesZiel.typ === "eliminieren") {
-                    document.getElementById('objective-text').innerText = aktuellesZiel.name + " (" + gegnerArray.length + " übrig)";
-                } else if(aktuellesZiel.typ === "panzer") {
-                    document.getElementById('objective-text').innerText = aktuellesZiel.name;
-                } else {
-                    document.getElementById('objective-text').innerText = aktuellesZiel.name;
-                }
-            }
-        }
-
-
-        function renderLevelMenu() {
-            const grid=document.getElementById('level-grid');
-            grid.innerHTML="";
-            missionsSzenerien.forEach((m,i)=>{
-                const card=document.createElement('div');
-                card.className='level-card';
-                card.innerHTML='<b>Level '+(i+1)+': '+m.name+'</b><br><small>Einsatzgebiet: '+m.name+'</small>';
-                const btn=document.createElement('button');
-                btn.textContent='LEVEL '+(i+1)+' STARTEN';
-                btn.onclick=function(){ spieler.mission=i+1; spieler.hp=100; starteMission(); toggleLevelMenu(); };
-                card.appendChild(btn);
-                grid.appendChild(card);
-            });
-        }
-        function toggleLevelMenu() {
-            const menu=document.getElementById('level-menu');
-            const open=menu.style.display==='block';
-            menu.style.display=open?'none':'block';
-            if(!open) renderLevelMenu();
-        }
-        document.getElementById('level-btn').addEventListener('click',toggleLevelMenu);
-
-        function toggleShop() {
-            const menu = document.getElementById('shop-menu');
-            const sichtbar = menu.style.display === 'block';
-            menu.style.display = sichtbar ? 'none' : 'block';
-            if(!sichtbar) renderShop();
-        }
-        document.getElementById('shop-btn').addEventListener('click', toggleShop);
-        document.getElementById('plane-btn').addEventListener('pointerdown', (e)=>{ e.preventDefault(); e.stopPropagation(); toggleFlugzeugEinsteigen(); });
-        document.getElementById('tank-btn').addEventListener('pointerdown', (e)=>{
-            e.preventDefault();
-            e.stopPropagation();
-            togglePanzerEinsteigen();
-        });
-
-        function renderShop() {
-            const list = document.getElementById('shop-list');
-            list.innerHTML = "";
-            waffenListe.forEach(w => {
-                let div = document.createElement('div');
-                div.className = 'shop-item';
-                div.innerHTML = `
-                    <span><b>${w.name}</b> (Schaden: ${w.schaden})</span>
-                    <span>${w.gekauft ? 'Bereits im Besitz' : w.preis + '$'} 
-                    <button class="buy-btn" onclick="kaufeWaffe(${w.id})">${w.gekauft && aktuelleWaffe.id === w.id ? 'Ausgewählt' : (w.gekauft ? 'Auswählen' : 'Kaufen')}</button></span>
-                `;
-                list.appendChild(div);
-            });
-        }
-
-        window.kaufeWaffe = function(id) {
-            let waffe = waffenListe.find(w => w.id === id);
-            if(waffe.gekauft) {
-                aktuelleWaffe = waffe;
-            } else if(spieler.credits >= waffe.preis) {
-                spieler.credits -= waffe.preis;
-                waffe.gekauft = true;
-                aktuelleWaffe = waffe;
-            } else {
-                alert("Nicht genug Credits!");
-            }
-            toggleShop();
-            ausgebenUI();
-        }
-
-        // --- GAME LOOP ---
-        const velocity = new THREE.Vector3();
-        const clock = new THREE.Clock();
-
-        function animate() {
-            requestAnimationFrame(animate);
-            const delta = clock.getDelta();
-
-            // In jeder Mission fällt dauerhaft Regen.
-            aktualisiereRegen(delta);
-
-            if(spieler.lastDamageTime > 0) {
-                spieler.lastDamageTime -= delta;
-                document.getElementById('hud').style.transform = Math.sin(spieler.lastDamageTime * 55) * 3 + 'px';
-            } else {
-                document.getElementById('hud').style.transform = 'translateX(0)';
-            }
-
-            if(!spielerImPanzer && !spielerImFlugzeug){
-                rotationY -= lookInput.x * 0.03;
-                rotationX += lookInput.y * 0.03;
-                rotationX = Math.max(-Math.PI/3, Math.min(Math.PI/3, rotationX));
-                camera.quaternion.setFromEuler(new THREE.Euler(rotationX, rotationY, 0, 'YXZ'));
-            }
-
-            aktualisierePanzer(delta);
-            aktualisiereFlugzeug(delta);
-            aktualisierePanzerButton();
-            aktualisiereFlugzeugButton();
-
-            const vorherX = camera.position.x;
-            const vorherZ = camera.position.z;
-            if(!spielerImPanzer && !spielerImFlugzeug){
-                velocity.set(moveInput.x, 0, -moveInput.y);
-                if(velocity.lengthSq()>0.0001){
-                    velocity.normalize();
-                    velocity.applyQuaternion(camera.quaternion);
-                    velocity.y = 0;
-                    camera.position.addScaledVector(velocity, delta * 12);
-                }
-            }
-
-            // Türen öffnen/schließen automatisch, wenn der Spieler sich nähert.
-            aktualisiereTueren();
-
-            // Gebäude haben echte Wände und Türen. Durch Wände kann man nicht laufen.
-            if(!spielerImPanzer) korrigiereGebaeudeKollision(vorherX, vorherZ);
-
-            // Unsichtbare Grenzen der Spielwelt: der Spieler kann die Szenerie nicht verlassen.
-            // Mission 4 ist deutlich größer und nutzt wie das Flugzeug den Bereich ±245.
-            const weltGrenze = spieler.mission === 4 ? 245 : 126;
-            camera.position.x = Math.max(-weltGrenze, Math.min(weltGrenze, camera.position.x));
-            camera.position.z = Math.max(-weltGrenze, Math.min(weltGrenze, camera.position.z));
-            if(!spielerImPanzer) aktualisiereEtagenMarker();
-            // Die sichtbaren Treppen bleiben im Hochhaus, aber die Etagen werden
-            // jetzt sicher über die markierten Teleportflächen gewechselt.
-            const aufTreppe = spielerImPanzer;
-            if(!aufTreppe) {
-                // Böden der Hochhaus-Etagen tragen den Spieler, damit er auf
-                // jedem Stockwerk stehen und springen kann, ohne durchzufallen.
-                const etagenBoden = findeEtagenBoden();
-                const landHoehe = etagenBoden ? etagenBoden.oberkante + sprungHoehe : sprungHoehe;
-
-                if(!istInDerLuft) {
-                    if(etagenBoden && camera.position.y <= landHoehe + 0.35) {
-                        camera.position.y = landHoehe;
-                    } else if(!etagenBoden && camera.position.y > sprungHoehe + 0.08) {
-                        // Wenn der Spieler eine erhöhte Fläche verlässt, fällt er wieder.
-                        istInDerLuft = true;
-                        sprungGeschwindigkeit = Math.min(sprungGeschwindigkeit, 0);
-                    } else if(camera.position.y <= sprungHoehe + 0.02) {
-                        camera.position.y = sprungHoehe;
-                    }
-                }
-
-                if(istInDerLuft) {
-                    sprungGeschwindigkeit -= 18 * delta;
-                    camera.position.y += sprungGeschwindigkeit * delta;
-
-                    const aktuellerBoden = findeEtagenBoden();
-                    const bodenHoehe = aktuellerBoden ? aktuellerBoden.oberkante + sprungHoehe : sprungHoehe;
-                    if(camera.position.y <= bodenHoehe) {
-                        camera.position.y = bodenHoehe;
-                        sprungGeschwindigkeit = 0;
-                        istInDerLuft = false;
-                    }
-                }
-            }
-
-            if(spielerImPanzer && panzerObjekt){
-                // Die Kamera bleibt im Panzer und der Panzer nimmt keinen normalen Fallschaden.
-                camera.position.y=3.35;
-            }
-
-            if(aktuellesZiel && aktuellesZiel.typ === "ueberleben" && !missionAbgeschlossen) {
-                zielZeit -= delta;
-            }
-
-            ueberpruefeMission();
-
-            gegnerArray.forEach(g => {
-                // Treffer-Blinken zurücksetzen
-                if(g.flashTimer > 0) {
-                    g.flashTimer -= delta;
-                    if(g.flashTimer <= 0) g.material.color.setHex(0x3d5137);
-                }
-
-                // Unterschiedliche KI-Verhalten
-                g.animTime += delta;
-
-                const parts = g.mesh.userData.parts;
-                const walk = Math.sin(g.animTime * (5.5 + spieler.mission * 0.1) + g.walkPhase) * 0.55;
-
-                // Treffer-Blinken zurücksetzen
-                if(g.flashTimer > 0) {
-                    g.flashTimer -= delta;
-                    if(g.flashTimer <= 0) g.material.color.setHex(0x3d5137);
-                }
-
-                // Todesanimation
-                if(g.dying) {
-                    g.deathTime += delta;
-                    const t = Math.min(g.deathTime / 0.65, 1);
-                    g.mesh.rotation.x = -t * Math.PI * 0.48;
-                    g.mesh.position.y = -0.45 * t;
-
-                    if(t >= 1 && !g.mesh.userData.deathAwarded) {
-                        g.mesh.userData.deathAwarded = true;
-                        scene.remove(g.mesh);
-                        gegnerArray = gegnerArray.filter(x => x !== g);
-                        spieler.credits += 50 * spieler.mission;
-                        if(aktuellesZiel && aktuellesZiel.typ === "eliminieren") ueberpruefeMission();
-                    }
-                    return;
-                }
-
-                // Laufanimation
-                if(parts.leftArm && parts.rightArm) {
-                    parts.leftArm.rotation.z = -0.22 + walk * 0.45;
-                    parts.rightArm.rotation.z = 0.22 - walk * 0.45;
-                }
-                if(parts.leftLeg && parts.rightLeg) {
-                    parts.leftLeg.rotation.x = walk * 0.65;
-                    parts.rightLeg.rotation.x = -walk * 0.65;
-                }
-
-                let richtung = new THREE.Vector3().subVectors(camera.position, g.mesh.position);
-                richtung.y = 0;
-                const dist = richtung.length();
-
-                // Soldaten bleiben zunächst an ihrem Spawnpunkt.
-                // Sie entdecken den Spieler erst, wenn er in ihrer Sichtweite ist.
-                const erkennungReichweite = 42 + spieler.mission * 1.8;
-                if(!g.entdeckt && g.geiselWache && dist<g.geiselSichtReichweite){
-                    const wachBlick=new THREE.Vector3(0,0,1).applyQuaternion(g.mesh.quaternion);
-                    wachBlick.y=0;
-                    if(wachBlick.lengthSq()>0.01) wachBlick.normalize();
-                    const zurSpieler=camera.position.clone().sub(g.mesh.position);
-                    zurSpieler.y=0;
-                    if(zurSpieler.lengthSq()>0.01) zurSpieler.normalize();
-                    const auge=g.mesh.position.clone(); auge.y+=1.45;
-                    const ziel=camera.position.clone(); ziel.y=1.4;
-                    if(istSichtkontakt(auge,ziel) && wachBlick.dot(zurSpieler)>g.geiselSichtSchwelle){
-                        g.entdeckt=true; g.entdeckungsZeit=0; alarmGeisel();
-                    }
-                }
-
-                if(!g.entdeckt && dist < erkennungReichweite && !g.geiselWache) {
-                    const blickrichtung = new THREE.Vector3();
-                    camera.getWorldDirection(blickrichtung);
-                    blickrichtung.y = 0;
-                    if(blickrichtung.lengthSq() > 0.01) blickrichtung.normalize();
-
-                    const zumSoldaten = g.mesh.position.clone().sub(camera.position);
-                    zumSoldaten.y = 0;
-                    if(zumSoldaten.lengthSq() > 0.01) {
-                        zumSoldaten.normalize();
-                        const sichtwinkel = blickrichtung.dot(zumSoldaten);
-
-                        // Der Soldat entdeckt den Spieler nur bei freier Sicht.
-                        const soldatAuge = g.mesh.position.clone();
-                        soldatAuge.y += 1.45;
-                        const spielerZiel = camera.position.clone();
-                        spielerZiel.y = 1.4;
-                        const freieSicht = istSichtkontakt(soldatAuge, spielerZiel);
-
-                        const sichtSchwelle = Math.max(0.30, 0.45 - spieler.mission * 0.012);
-                        if(freieSicht && (sichtwinkel > sichtSchwelle || dist < 12)) {
-                            g.entdeckt = true;
-                            g.entdeckungsZeit = 0;
-                        }
-                    }
-                }
-
-                // Noch nicht entdeckt: Marker bewachen. Die Soldaten bleiben in der Nähe
-                // des Missionsziels und kehren dorthin zurück, wenn sie zu weit weg sind.
-                if(!g.entdeckt) {
-                    if(g.geiselWache && !g.festerPosten) {
-                        g.mesh.position.copy(g.spawnPosition);
-                        g.mesh.rotation.y = g.geiselBlickRotation + Math.sin(g.animTime*0.35 + g.walkPhase)*0.08;
-                        return;
-                    }
-                    if(g.festerPosten) {
-                        // Langsames Absuchen des Geländes vom Wachturm aus.
-                        g.mesh.rotation.y += Math.sin(g.animTime * 0.32 + g.turmIndex) * delta * 0.22;
-                    }
-                    if(g.schutzpunkt) {
-                        const zurMarkierung = new THREE.Vector3().subVectors(g.schutzpunkt, g.mesh.position);
-                        zurMarkierung.y = 0;
-                        const distZurMarkierung = zurMarkierung.length();
-                        if(distZurMarkierung > 11) {
-                            zurMarkierung.normalize();
-                            g.mesh.position.addScaledVector(zurMarkierung, delta * 1.15);
-                            g.mesh.rotation.y = Math.atan2(zurMarkierung.x, zurMarkierung.z);
-                        } else {
-                            g.mesh.rotation.y = Math.sin(g.animTime * 0.4 + g.walkPhase) * 0.12;
-                        }
-                    } else {
-                        g.mesh.position.copy(g.spawnPosition);
-                        g.mesh.rotation.y = Math.sin(g.animTime * 0.4 + g.walkPhase) * 0.12;
-                    }
-                    return;
-                }
-
-                // Beschützer bleiben an der Markierung: sie verfolgen den Spieler
-                // nicht endlos durch die ganze Karte.
-                if(g.schutzpunkt) {
-                    const distZurMarkierung = g.mesh.position.distanceTo(g.schutzpunkt);
-                    const spielerZurMarkierung = camera.position.distanceTo(g.schutzpunkt);
-                    if(spielerZurMarkierung > 30 && distZurMarkierung > 15) {
-                        g.entdeckt = false;
-                        g.shotCooldown = 1.0;
-                        return;
-                    }
-                    if(distZurMarkierung > 18 && dist > 10) {
-                        const zurMarkierung = new THREE.Vector3().subVectors(g.schutzpunkt, g.mesh.position);
-                        zurMarkierung.y = 0;
-                        if(zurMarkierung.lengthSq() > 0.01) {
-                            zurMarkierung.normalize();
-                            g.mesh.position.addScaledVector(zurMarkierung, delta * 1.35);
-                        }
-                    }
-                }
-
-                // Verhalten 1: Angreifer - verteidigt den Marker und greift den Spieler an
-                // Verhalten 2: Scharfschütze - hält Abstand und schießt aus der Distanz
-                // Verhalten 3: Flanker - versucht seitlich um den Spieler herumzukommen
-                // Verhalten 4: Verteidiger - bleibt eher bei seinem Startgebiet und greift dort an
-                // Wachturm-Schützen bleiben auf ihrem festen Posten.
-                if(!g.festerPosten) {
-                    let ziel = new THREE.Vector3();
-
-                if(g.verhalten === "angreifer") {
-                    ziel.copy(camera.position);
-                    // Ein Angreifer darf den Schutzbereich nicht verlassen.
-                    const schutzDist = g.schutzpunkt ? g.mesh.position.distanceTo(g.schutzpunkt) : 0;
-                    if(dist > 6 && (!g.schutzpunkt || schutzDist < 18)) {
-                        richtung.normalize();
-                        g.mesh.position.addScaledVector(richtung, delta * (2.25 + spieler.mission * 0.18));
-                    }
-                } else if(g.verhalten === "scharfschuetze") {
-                    if(dist < 16) {
-                        richtung.normalize();
-                        g.mesh.position.addScaledVector(richtung, -delta * (1.05 + spieler.mission * 0.035));
-                    } else if(dist > 28) {
-                        richtung.normalize();
-                        g.mesh.position.addScaledVector(richtung, delta * (0.85 + spieler.mission * 0.035));
-                    } else {
-                        // Kleine seitliche Positionsänderungen, damit der Scharfschütze nicht stillsteht
-                        const side = new THREE.Vector3(-richtung.z, 0, richtung.x).multiplyScalar(g.strafeDir);
-                        g.strafeTimer -= delta;
-                        if(g.strafeTimer <= 0) {
-                            g.strafeDir *= -1;
-                            g.strafeTimer = 1.5 + Math.random()*2;
-                        }
-                        g.mesh.position.addScaledVector(side, delta * (0.40 + spieler.mission * 0.015));
-                    }
-                } else if(g.verhalten === "flanker") {
-                    const side = new THREE.Vector3(-richtung.z, 0, richtung.x).multiplyScalar(g.strafeDir);
-                    if(dist > 10) {
-                        richtung.normalize();
-                        ziel.copy(richtung).multiplyScalar(0.55).add(side.normalize().multiplyScalar(0.8)).normalize();
-                        g.mesh.position.addScaledVector(ziel, delta * (1.70 + spieler.mission * 0.10));
-                    } else {
-                        g.strafeTimer -= delta;
-                        if(g.strafeTimer <= 0) {
-                            g.strafeDir *= -1;
-                            g.strafeTimer = 1 + Math.random()*1.5;
-                        }
-                        g.mesh.position.addScaledVector(side.normalize(), delta * (1.10 + spieler.mission * 0.06) * g.strafeDir);
-                    }
-                } else {
-                    // Verteidiger: bewegt sich nur begrenzt vom Spawnpunkt weg
-                    const homeDir = new THREE.Vector3().subVectors(g.spawnPosition, g.mesh.position);
-                    if(homeDir.length() > 9) {
-                        homeDir.normalize();
-                        g.mesh.position.addScaledVector(homeDir, delta * (1.30 + spieler.mission * 0.05));
-                    } else if(dist < 13) {
-                        richtung.normalize();
-                        g.mesh.position.addScaledVector(richtung, -delta * (0.90 + spieler.mission * 0.04));
-                    }
-                }
-
-                }
-
-                // Erst nach der Entdeckung darf der Soldat den Spieler verfolgen.
-                const lookDir = new THREE.Vector3().subVectors(camera.position, g.mesh.position);
-                lookDir.y = 0;
-                if(lookDir.lengthSq() > 0.01) {
-                    g.mesh.rotation.y = Math.atan2(lookDir.x, lookDir.z);
-                }
-
-                // Waffenhaltung: nah = Anschlag, sonst normale Laufhaltung
-                const schussReichweite = g.verhalten === "scharfschuetze" ? 42 :
-                                         g.verhalten === "verteidiger" ? 30 : 24;
-
-                const soldatAugeFuerSchuss = g.mesh.position.clone();
-                soldatAugeFuerSchuss.y += 1.45;
-                const spielerZielFuerSchuss = camera.position.clone();
-                spielerZielFuerSchuss.y = 1.4;
-                const schussSicht = istSichtkontakt(soldatAugeFuerSchuss, spielerZielFuerSchuss);
-
-                if(g.entdeckt && dist < schussReichweite && schussSicht && !spielerIstImGebaeudeGeschuetzt()) {
-                    if(g.festerPosten) {
-                        // Scharfschütze: stabile Anschlagshaltung mit leichtem Atem-/Zielwackeln.
-                        const atem = Math.sin(g.animTime * 1.8 + g.turmIndex) * 0.025;
-                        if(parts.leftArm && parts.rightArm) {
-                            parts.leftArm.rotation.z = -0.88 + atem;
-                            parts.rightArm.rotation.z = 0.88 - atem;
-                        }
-                        if(parts.leftLeg && parts.rightLeg) {
-                            parts.leftLeg.rotation.x = 0.02;
-                            parts.rightLeg.rotation.x = -0.02;
-                        }
-                        if(parts.rifle) {
-                            parts.rifle.rotation.x = Math.sin(g.animTime * 1.6) * 0.018;
-                        }
-                    } else if(parts.leftArm && parts.rightArm) {
-                        parts.leftArm.rotation.z = -0.72;
-                        parts.rightArm.rotation.z = 0.72;
-                    }
-                    if(parts.leftLeg && parts.rightLeg) {
-                        parts.leftLeg.rotation.x = 0;
-                        parts.rightLeg.rotation.x = 0;
-                    }
-
-                    // Soldaten schießen jetzt wirklich auf den Spieler.
-                    g.shotCooldown -= delta;
-                    if(g.shotCooldown <= 0 && dist > 5) {
-                        const cooldownBase = g.verhalten === "scharfschuetze" ? 1.65 :
-                                             g.verhalten === "angreifer" ? 0.82 : 1.20;
-                        const schwierigkeitsFaktor = Math.max(0.52, 1 - spieler.mission * 0.035);
-                        g.shotCooldown = (cooldownBase * schwierigkeitsFaktor) + Math.random()*(0.75 + schwierigkeitsFaktor*0.45);
-                        g.muzzleTime = 0.16;
-                        g.shootAnimTime = 0.16;
-                        g.shootRecoil = 0;
-                        playShootSound();
-
-                        const flash = new THREE.Mesh(
-                            new THREE.SphereGeometry(0.13, 6, 6),
-                            new THREE.MeshBasicMaterial({color: 0xffcc55})
-                        );
-                        flash.position.set(0.52, 1.65, -1.72);
-                        g.mesh.add(flash);
-                        g.muzzleFlash = flash;
-
-                        if(parts.rifle) parts.rifle.position.z = -0.94;
-                        // sichtbare Schussbewegung: Arme ziehen die Waffe kurz zurück
-                        if(parts.leftArm && parts.rightArm) {
-                            parts.leftArm.rotation.z = -0.82;
-                            parts.rightArm.rotation.z = 0.82;
-                        }
-
-                        // Trefferchance abhängig vom Soldatentyp und der Entfernung.
-                        const accuracyBase = g.verhalten === "scharfschuetze" ? 0.90 :
-                                             g.verhalten === "angreifer" ? 0.53 : 0.70;
-                        const distancePenalty = Math.min(dist / 70, 0.30);
-                        const missionAccuracy = Math.min(0.12, spieler.mission * 0.010);
-                        const hitChance = Math.min(0.96, Math.max(0.28, accuracyBase + missionAccuracy - distancePenalty));
-
-                        if(Math.random() < hitChance) {
-                            const damage = (g.verhalten === "scharfschuetze" ? 14 :
-                                           g.verhalten === "angreifer" ? 8 : 10) +
-                                           Math.floor(spieler.mission * 0.8);
-                            if(spielerImPanzer && panzerObjekt){
-                                panzerObjekt.userData.hp = Math.max(0, (panzerObjekt.userData.hp ?? 500) - damage*1.8);
-                                panzerObjekt.userData.hitFlash = 0.12;
-                                ausgebenUI();
-                                if(panzerObjekt.userData.hp <= 0){
-                                    spielerImPanzer=false;
-                                    alert("Der Panzer wurde zerstört! Die Mission startet neu.");
-                                    panzerObjekt.userData.hp=500;
-                                    spieler.hp=100;
-                                    starteMission();
-                                    ausgebenUI();
-                                }
-                            } else {
-                                spieler.hp = Math.max(0, spieler.hp - damage);
-                                spieler.lastDamageTime = 0.18;
-                                playPlayerHitSound();
-                                ausgebenUI();
-
-                                if(spieler.hp <= 0) {
-                                spieler.hp = 0;
-                                ausgebenUI();
-                                setTimeout(() => {
-                                    if(spieler.hp <= 0) {
-                                        alert("Du wurdest von den Soldaten eliminiert! Die Mission startet neu.");
-                                        spieler.hp = 100;
-                                        starteMission();
-                                        ausgebenUI();
-                                    }
-                                }, 250);
-                                }
-                            }
-                        }
-                    }
-
-                    if(g.shootAnimTime > 0) {
-                        g.shootAnimTime -= delta;
-                        const p = Math.max(0, g.shootAnimTime / 0.16);
-                        const kick = Math.sin((1 - p) * Math.PI) * 0.18;
-                        if(parts.rifle) parts.rifle.position.z = -0.75 - kick;
-                        if(parts.leftArm && parts.rightArm) {
-                            parts.leftArm.rotation.z = -0.72 - kick * 0.7;
-                            parts.rightArm.rotation.z = 0.72 + kick * 0.7;
-                        }
-                    }
-
-                    if(g.muzzleTime > 0) {
-                        g.muzzleTime -= delta;
-                        if(g.muzzleFlash) {
-                            g.muzzleFlash.scale.setScalar(1 + Math.random()*0.7);
-                            g.muzzleFlash.visible = true;
-                        }
-                        if(g.muzzleTime <= 0) {
-                            if(g.muzzleFlash) {
-                                g.mesh.remove(g.muzzleFlash);
-                                g.muzzleFlash = null;
-                            }
-                            if(parts.rifle) parts.rifle.position.z = -0.75;
-                        }
-                    }
-                }
-
-                // Nahkampfschaden nur bei sehr kurzer Distanz
-                if(g.entdeckt && dist < 2.2) {
-                    g.attackCooldown -= delta;
-                    if(g.attackCooldown <= 0) {
-                        spieler.hp = Math.max(0, spieler.hp - 4);
-                        g.attackCooldown = 1.0;
-                        playPlayerHitSound();
-                        ausgebenUI();
-
-                        if(spieler.hp <= 0) {
-                            alert("Du wurdest im Nahkampf eliminiert! Die Mission startet neu.");
-                            spieler.hp = 100;
-                            starteMission();
-                            ausgebenUI();
-                        }
-                    }
-                }
-            });
-
-            if(spieler.mission===3){
-                panzerZerstoerbareObjekte=panzerZerstoerbareObjekte.filter(o=>o && (o.parent || o.userData.zerstoert));
-                const mauerRest=panzerZerstoerbareObjekte.some(o=>o.userData.zielTyp==='sperrmauer' && !o.userData.zerstoert);
-                const plattenRest=panzerZerstoerbareObjekte.some(o=>o.userData.zielTyp==='flugzeugPanzerplatte' && !o.userData.zerstoert);
-                if(!mauerRest) panzerGebietOffen=true;
-                if(aktuellesZiel && aktuellesZiel.typ==='flugzeug'){
-                    // Die Außenmauer muss nicht komplett zerstört werden.
-                    // Sobald der Panzer durch die offene Zufahrt im Gebiet ist,
-                    // beginnt direkt das Hangar-Ziel.
-                    const gebietCx=85, gebietCz=-85, gebietHalf=32;
-                    const panzerImGebiet = panzerObjekt &&
-                        panzerObjekt.position.x > gebietCx-gebietHalf+3 &&
-                        panzerObjekt.position.x < gebietCx+gebietHalf-3 &&
-                        panzerObjekt.position.z > gebietCz-gebietHalf+3 &&
-                        panzerObjekt.position.z < gebietCz+gebietHalf-3;
-
-                    if(!panzerImGebiet) {
-                        aktuellesZiel.name='Fahre mit dem Panzer durch die Zufahrt in das markierte Gebiet';
-                    } else if(plattenRest) {
-                        aktuellesZiel.name='Zerstöre die Panzerplatten des Hangars';
-                    } else {
-                        aktuellesZiel.name='Finde das geheime Flugzeug im Hangar';
-                    }
-                }
-                if(!plattenRest && geheimesFlugzeug){
-                    geheimesFlugzeug.visible=true;
-                    const ring=szenerieGruppe.children.find(o=>o.userData && o.userData.missionMarker);
-                    if(ring){
-                        ring.visible=true;
-                        if(ring.userData.label) ring.userData.label.visible=true;
-                    }
-                }
-            }
-
-            // Mission 12: Verbündete werden fortlaufend aktualisiert.
-            if(spieler.mission===12) updateVerbuendete(delta);
-
-            // Dynamische Schatten/Realismus: neue Szenenobjekte einmalig für Schatten vorbereiten.
-            if(!scene.userData.schattierungVorbereitet) {
-                scene.traverse(obj => {
-                    if(obj.isMesh) {
-                        obj.castShadow = true;
-                        obj.receiveShadow = true;
-                    }
-                });
-                scene.userData.schattierungVorbereitet = true;
-            }
-
-            renderer.render(scene, camera);
-        }
-
-        starteMission();
-        camera.position.y = sprungHoehe;
-        animate();
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-    </script>
-</body>
-</html>
