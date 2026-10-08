@@ -3651,10 +3651,6 @@
                 const d=lastwagenObjekt.position.distanceTo(lastwagenZielZone.position);
                 if(d<10) missionErfolgreich();
             }
-            if(aktuellesZiel.typ === "geheimer_schluessel"){
-                aktualisiereGeheimenSchluessel(delta);
-            }
-
             if(aktuellesZiel.typ === "panzer" && panzerObjekt) {
                 const d=camera.position.distanceTo(panzerPosition);
                 if(d<7.5) missionErfolgreich();
