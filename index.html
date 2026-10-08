@@ -421,6 +421,7 @@
         let munitionslagerObjekt=null;
         let munitionslagerHp=3;
         let munitionslagerZerstoert=false;
+        let atombombeObjekt=null;
 
         // Begehbare Gebäude: nur Wände blockieren den Spieler, die Türen bleiben offen.
         let weltKollisionsobjekte = [];
@@ -1754,6 +1755,37 @@
         }
 
 
+        function baueMission6Atombombe(){
+            if(atombombeObjekt && atombombeObjekt.parent) atombombeObjekt.parent.remove(atombombeObjekt);
+            const bomb=new THREE.Group();
+            const dark=new THREE.MeshLambertMaterial({color:0x202326});
+            const metal=new THREE.MeshLambertMaterial({color:0x5d6468,metalness:0.25});
+            const body=new THREE.Mesh(new THREE.CylinderGeometry(1.8,2.0,5.5,16),dark);
+            body.rotation.z=Math.PI/2;
+            bomb.add(body);
+            const nose=new THREE.Mesh(new THREE.ConeGeometry(1.8,2.4,16),metal);
+            nose.rotation.z=-Math.PI/2; nose.position.x=3.95; bomb.add(nose);
+            const tail=new THREE.Mesh(new THREE.CylinderGeometry(2.1,1.4,1.0,16),metal);
+            tail.rotation.z=Math.PI/2; tail.position.x=-3.0; bomb.add(tail);
+            for(const z of [-1.4,1.4]){
+                const fin=new THREE.Mesh(new THREE.BoxGeometry(2.2,0.25,1.1),metal);
+                fin.position.set(-2.2,1.0,z); fin.rotation.x=z>0?-0.35:0.35; bomb.add(fin);
+            }
+            // Roter Zielring und sichtbarer Warn-/Radioaktivitätsmarker.
+            const ring=new THREE.Mesh(new THREE.RingGeometry(3.4,4.2,32),new THREE.MeshBasicMaterial({color:0xff3333,side:THREE.DoubleSide,transparent:true,opacity:.8}));
+            ring.rotation.x=-Math.PI/2; ring.position.y=-1.75; bomb.add(ring);
+            const beacon=new THREE.Mesh(new THREE.CylinderGeometry(.18,.18,6,8),new THREE.MeshBasicMaterial({color:0xffff00}));
+            beacon.position.y=3; bomb.add(beacon);
+            const canvas=document.createElement('canvas'); canvas.width=512; canvas.height=128;
+            const ctx=canvas.getContext('2d'); ctx.fillStyle='rgba(0,0,0,.86)'; ctx.fillRect(0,0,512,128);
+            ctx.fillStyle='#fff'; ctx.font='bold 42px sans-serif'; ctx.textAlign='center'; ctx.fillText('☢ ATOMBOMBE ☢',256,78);
+            const label=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),transparent:true,depthTest:false}));
+            label.scale.set(9,2.2,1); label.position.y=5; bomb.add(label);
+            bomb.position.set(-72,2.5,-68);
+            szenerieGruppe.add(bomb);
+            atombombeObjekt=bomb;
+        }
+
         function baueMission5Munitionslager(){
             const lager=new THREE.Group();
             const cx=0, cz=-82;
@@ -2452,6 +2484,7 @@
 
             if(missionsNummer===1 || missionsNummer===2 || missionsNummer===3) bauePanzerMission();
             if(missionsNummer===4) baueMission4Flugzeug();
+            if(missionsNummer===6) baueMission6Atombombe();
             if(missionsNummer===3) baueMission3PanzerGebiet();
             if(daten.objekt === "geisel") baueGeiselSzenerie();
             if(daten.objekt === "verbuendete") baueVerbuendetenSzenerie();
@@ -3318,8 +3351,10 @@
                 aktuellesZiel={typ:"flugzeug",name:"Dringe in das Gebiet ein und zerstöre den Hangar"};
             } else if(spieler.mission===4) {
                 aktuellesZiel={typ:"flugzeug_fahrt",name:"Bringe das Flugzeug in das sichere Versteck"};
-            } else if(spieler.mission===5) {
+                        } else if(spieler.mission===5) {
                 aktuellesZiel={typ:"munitionslager",name:"Bombardiere das Munitionslager"};
+            } else if(spieler.mission===6) {
+                aktuellesZiel={typ:"atombombe",name:"Finde die Atombombe"};
             } else if(spieler.mission===11) {
                 aktuellesZiel={typ:"geisel",name:"Rette die Geisel – kein Alarm!"};
             } else if(spieler.mission===12) {
@@ -3411,6 +3446,10 @@
                 const d=camera.position.distanceTo(geiselZone.position);
                 if(d<4.0) missionErfolgreich();
             }
+            if(aktuellesZiel.typ === "atombombe" && atombombeObjekt && !missionAbgeschlossen) {
+                const d=camera.position.distanceTo(atombombeObjekt.position);
+                if(d<8) missionErfolgreich();
+            }
             if(aktuellesZiel.typ === "panzer" && panzerObjekt) {
                 const d=camera.position.distanceTo(panzerPosition);
                 if(d<7.5) missionErfolgreich();
@@ -3445,6 +3484,7 @@
             if(geiselObjekt){scene.remove(geiselObjekt);geiselObjekt=null;}
             if(panzerObjekt){scene.remove(panzerObjekt);panzerObjekt=null;}
             flugzeugObjekt=null; spielerImFlugzeug=false; flugzeugGeschwindigkeit=0; flugzeugPitch=0;
+            atombombeObjekt=null;
             spielerImPanzer=false;
             panzerFahrbar=false;
             panzerTurm=null;
