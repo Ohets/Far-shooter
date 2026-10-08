@@ -1923,38 +1923,14 @@
         function mission4AbschlussBereitFuer5(){
             if(mission4UebergangAktiv) return;
             mission4UebergangAktiv=true;
-            missionAbgeschlossen=false;
+
+            // Mission 4 ist abgeschlossen. Das gleiche Flugzeug bleibt erhalten
+            // und Mission 5 startet sofort in der Luft.
+            missionAbgeschlossen=true;
             spieler.credits+=200;
             spieler.mission=5;
-            aktuellesZiel={
-                typ:"flugzeug_uebergang",
-                name:"Fliege durch die grüne Markierung – der nächste Einsatz beginnt dort"
-            };
 
-            const q=new THREE.Quaternion().setFromEuler(
-                new THREE.Euler(flugzeugObjekt.rotation.x,flugzeugObjekt.rotation.y,flugzeugPitch,'YXZ')
-            );
-            const forward=new THREE.Vector3(1,0,0).applyQuaternion(q).normalize();
-
-            const marker=new THREE.Group();
-            const ring=new THREE.Mesh(
-                new THREE.RingGeometry(5.5,6.5,36),
-                new THREE.MeshBasicMaterial({color:0x00ff66,side:THREE.DoubleSide,transparent:true,opacity:0.85})
-            );
-            ring.rotation.x=-Math.PI/2;
-            marker.add(ring);
-
-            const beacon=new THREE.Mesh(
-                new THREE.CylinderGeometry(0.2,0.2,8,8),
-                new THREE.MeshBasicMaterial({color:0x00ff66})
-            );
-            beacon.position.y=4;
-            marker.add(beacon);
-
-            marker.position.copy(flugzeugObjekt.position).addScaledVector(forward,35);
-            marker.position.y=0.1;
-            szenerieGruppe.add(marker);
-            mission4UebergangMarker=marker;
+            oeffneMission5AusFlugzeug();
             ausgebenUI();
         }
 
