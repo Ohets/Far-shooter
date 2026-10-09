@@ -3072,7 +3072,7 @@ if(missionsNummer===8){
                 }
             }
 
-            if(missionsNummer===1 || missionsNummer===2 || missionsNummer===3) bauePanzerMission();
+            if(missionsNummer===1 || missionsNummer===2 || missionsNummer===3 || missionsNummer===16) bauePanzerMission();
             if(missionsNummer===4) baueMission4Flugzeug();
             if(missionsNummer===6) baueMission6Atombombe();
             if(missionsNummer===8) baueMission8GeheimenSchluessel();
@@ -4268,6 +4268,12 @@ if(missionsNummer===8){
                 // Start innerhalb des Hochhauses, direkt beim versteckten Safe.
                 camera.position.set(86,2,-84);
                 rotationY=Math.PI;
+                rotationX=0;
+            }
+            if(spieler.mission===16){
+                // Startpunkt nahe beim Missionspanzer und Blick direkt auf das Fahrzeug.
+                camera.position.set(panzerPosition.x-18,2,panzerPosition.z+18);
+                rotationY=Math.atan2(panzerPosition.x-camera.position.x,panzerPosition.z-camera.position.z);
                 rotationX=0;
             }
             if(spieler.mission===18){
